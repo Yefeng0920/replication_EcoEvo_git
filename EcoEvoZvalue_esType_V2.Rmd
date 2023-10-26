@@ -1,0 +1,2192 @@
+---
+title: "Updated analysis on Eco-Evo $z values$"
+author: "Yefeng & Shinichi"
+date: "25/10/2023"
+output:
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    cache: TRUE
+    df_print: paged
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    keep_tex: no
+header-includes: \usepackage{amsmath}
+---
+
+# Global options
+```{r include = FALSE}
+knitr::opts_chunk$set(fig.height = 5, fig.width = 12)
+set.seed(2023)
+```
+
+# Packages and functions
+
+```{r, warning=FALSE, echo=TRUE}
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(readr)
+  library(tidyr)  # pivot_longer
+  library(flexmix)
+  library(ggplot2)
+  library(metafor)
+  library(here)
+  library(RColorBrewer)
+  library(ggExtra)
+  library(cowplot)
+  library(patchwork)
+  library(coda)
+  library(MCMCglmm)
+  })
+
+dmix = function(x,p,m,s){
+  p %*% sapply(x, function(x) dnorm(x,mean=m,sd=s))
+}
+
+rmix = function(n,p,m,s){    # sample from a normal mixture
+  d=rmultinom(n,1,p)
+  rnorm(n,m%*%d,s%*%d)
+}
+
+pmix = function(x,p,m,s){ # cumulative distr (vector x)
+  p %*% sapply(x, function(x) pnorm(x,mean=m,sd=s))
+}
+
+qfun = function(q,p,m,s){ # quantile function scalar q
+  uniroot(function(x) pmix(x,p,m,s)-q, interval=c(-20,20))$root
+}
+
+qmix = function(q,p,m,s){ # quantile function vector q
+  sapply(q, function(q) qfun(q,p=p,m=m,s=s) )
+}
+
+pmixabs = function(x,p,m,s){ # cumulative distr of |x|
+  p %*% sapply(x, function(x) pnorm(x,mean=m,sd=s) - 
+                 pnorm(-x,mean=m,sd=s))
+}
+
+qfunabs = function(q,p,m,s){ # quantile function scalar q
+  uniroot(function(x) pmixabs(x,p,m,s)-q, interval=c(0,20))$root
+}
+
+qmixabs = function(q,p,m,s){ # quantile function vector q
+  sapply(q, function(q) qfunabs(q,p=p,m=m,s=s) )
+}
+
+# p(SNR | z) when snr ~ dmix(p,m,s)
+posterior <- function(z,p,m,s) { 
+  s2=s^2
+  p=p*dnorm(z,m,sqrt(s2+1))
+  p <- p/sum(p)         # conditional mixing probs
+  pm <- z*s2/(s2+1) + m/(s2+1) # conditional means
+  pv <- s2/(s2+1)          # conditional variances
+  ps <- sqrt(pv)            # conditional std devs
+  data.frame(p,pm,ps)
+}
+
+rmix = function(n,p,m,s){    # sample from a normal mixture
+  d=rmultinom(n,1,p)
+  rnorm(n,m%*%d,s%*%d)
+}
+
+
+replcalc <- function(z,sigma = c(2.280994,5.045221,1,15.000259)) {
+  # sigma is the estimated variance component:
+  s=sqrt(sigma^2-1)
+  # z is the observed z value
+  post=posterior(z,c(0.52562843,0.18367977,0.22039779,0.07029401),c(0,0,0,0),s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  replicate=1 - pmix(1.96,p=pp,m=pm,s=sqrt(ps^2 +1))
+  df=data.frame(z = z, replicate = as.numeric(replicate))
+  return(df)
+}
+
+replcalcMD <- function(z,sigma = c(2.402012,15.679222,5.806508,1)) {
+  # sigma is the estimated variance component
+  s=sqrt(sigma^2-1)
+  # z is the observed z value
+  post=posterior(z,c(0.55008126,0.06563666,0.15015400,0.23412808),c(0,0,0,0),s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  replicate=1 - pmix(1.96,p=pp,m=pm,s=sqrt(ps^2 +1))
+  df=data.frame(z = z, replicate = as.numeric(replicate))
+  return(df)
+}
+
+replcalcZr <- function(z,sigma = c(1.000002,14.436200,2.104280,4.986809)) {
+  # sigma is the estimated variance component
+  s=sqrt(sigma^2-1)
+  # z is the observed z value
+  post=posterior(z,c(0.09757399,0.05735684,0.63760257,0.20746659),c(0,0,0,0),s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  replicate=1 - pmix(1.96,p=pp,m=pm,s=sqrt(ps^2 +1))
+  df=data.frame(z = z, replicate = as.numeric(replicate))
+  return(df)
+}
+
+```
+
+# Introduction
+
+The main analysis was based on Erik's example code (`analysis_2023_08_08.Rmd`). 
+
+Notes:
+
+(1) We have two independent dataset. One includes 400+ meta-analyses, and is the main dataset of the analysis. The other includes 70 meta-analyses, and is used as the robust/sensitivity analysis.
+
+(2) We conducted split analyses according to broad effect size types, namely, mean difference and correlation. Mean difference effect size measure is mainly used in the field of ecology, while correlation effect size measure is mainly used in evolution, albeit they have overlap.
+
+(3) We used the ad hoc strategy to deal with dependent effect size estimates (one study reports more than one effect size) in our dataset. The rationale of ad hoc strategy is to modify the data to conform to the assumptions of models for independent effect size estimates, such as aggregating effect size and sampling variance estimates to obtain one summary estimate per study. Aggregation has the sample empirical performance in terms of dealing with dependent effect size estimates, although it has the limitation of information loss.
+
+(4) We did not account for publication bias. As such, we need to interpret our results with caution. For example, for a given replication rate derived from our analysis, it should be interpreted as the maximum replication rate.
+
+
+# Original dataset {.tabset} 
+
+## Cleaning and modelling {.tabset} 
+
+### Pre-process
+
+Import the data (the .csv file named 'all effect size data edited 24-08').
+
+This is a much bigger eco evo dataset we have used in another paper.
+
+```{r}
+dat_all <- read.csv(here::here("data","main_dat.csv")) # # check data
+head(dat_all)
+dim(dat_all)
+```
+
+Clean the dataset
+
+```{r,warning=FALSE}
+# basic cleaning 
+dat_all <- dat_all[!is.na(dat_all$eff.size) & !is.na(dat_all$var.eff.size), ] # remove NAs
+dat_all <- dat_all[dat_all$var.eff.size != 0, ] # remove negative and zero variance (sampling variance should be positive)
+
+# classify effect size measures
+grouped_es <- NA
+grouped_es[dat_all$eff.size.measure == "cohens.d"|
+           dat_all$eff.size.measure == "hedges.d"|
+           dat_all$eff.size.measure == "hedges.g"|
+           dat_all$eff.size.measure == "abs.hedges.d"|
+           dat_all$eff.size.measure == "SMD"] <- c("SMD") # (1) SMD: cohens.d,  hedges.d, hedges.g, abs.hedges.d, SMD
+grouped_es[dat_all$eff.size.measure == "log.ratio"] <- c("lnRR") # (2) lnRR: log.ratio
+grouped_es[dat_all$eff.size.measure == "z.r"] <- c("Zr") # (3) Zr: z.r
+# (4) binary: IRR, log.odds.ratio
+#grouped_es[dat_all$eff.size.measure == "IRR" | 
+#           dat_all$eff.size.measure == "log.odds.ratio"] <- c("binary") 
+grouped_es[dat_all$eff.size.measure == "mean.diff" |
+           dat_all$eff.size.measure == "reg.slope" | 
+           dat_all$eff.size.measure == "IRR" | 
+           dat_all$eff.size.measure == "log.odds.ratio"] <- c("uncommon") # (5) uncommon: mean.diff, reg.slope
+dat_all$grouped_es <- as.factor(grouped_es)
+
+
+# only select relevant variables
+dat <- dat_all %>% select(paper.id, meta.analysis.paper, meta.analysis.id, meta.analysis.year, study, study.year, eff.size.measure, grouped_es, eff.size, var.eff.size)
+
+dat <- dat %>% mutate(se.eff.size = sqrt(var.eff.size)) # create the variable of sampling error
+dat <- dat %>% mutate(z = eff.size/se.eff.size) # calculate z value
+dat <- dat %>% filter(z < 40 & z > -40) # delete potential outliers - we do not have clear a cutoff, but z = 20 is common in eco evo; we can sensitivity analyses to check whether the results are robust to the arbitrary cut-off.
+
+# data that will be used for truncated folded distribution
+dat_folded <- dat
+dat_folded <- dat_folded %>% filter(abs(z) > qnorm(0.05/2,lower.tail = F) & abs(z) < 5) # z-curve's range
+```
+
+
+### Split dataset 
+
+Now we split the dataset according to effect size measures
+
+```{r,warning=FALSE}
+# add observational level id
+dat$obs <- 1:nrow(dat)
+
+# split the dataset into separate dataset according to the identity of meta-analysis
+ma.id <- dat$meta.analysis.id %>% unique()
+dat_list <- NA
+for (i in 1:length(ma.id)) {
+  dat_list[i] <- dat[dat$meta.analysis.id == i, ] %>% list() # compile them into a list, so that we can use sapply() to fit meta-analytic model for each meta-analytic case
+}
+
+# index the elements of the data list according to the order of meta-analysis cases. By doing this, we can find any meta-analytic case by retrieving its index
+names(dat_list) <- paste("MA", ma.id, sep = "_")
+
+# some datasets can not achieve convergence although we used different numerical optimizer, adjusted different step length. So we delete this dataset before model fitting
+dat_list <- dat_list[names(dat_list) != "MA_35" &
+                     names(dat_list) != "MA_67" &
+                     names(dat_list) != "MA_185" &
+                     names(dat_list) != "MA_313" &
+                     names(dat_list) != "MA_324" &
+                     names(dat_list) != "MA_358" &
+                     names(dat_list) != "MA_359" &
+                     names(dat_list) != "MA_406" &
+                     names(dat_list) != "MA_433"]
+
+#saveRDS(dat_list, file = "dat_list.Rds")
+#dat_list <- readRDS(file = "dat_list.Rds")
+dat_list <- readRDS(here::here("data","dat_list.Rds"))
+
+#-----------------------not run-------------------------------
+# publication bias test
+#model_all_pb <- NA
+#for (i in 1:length(dat_list)) {
+#  model_all_pb[i] <- rma.mv(yi = eff.size, V = var.eff.size, random = list(~1|study, ~1|obs), mods = ~ I(sqrt(var.eff.size)), method = "REML", test = "t", data = dat_list[[i]], sparse = TRUE, control=list(optimizer="nlminb", rel.tol=1e-8, iter.max=1000), verbose = T) %>% list()
+#} # slightly less strict threshold (which by default is 1e-10); adjust the number of iterations (which by default is 150)
+# save to save time
+# saveRDS(model_all_pb, file = "mod_fitted_pb.Rds")
+#-----------------------not run-------------------------------
+
+# load the pre-fitted publication bias model - the model specifications were shown above
+#model_all_pb <- readRDS(file = "mod_fitted_pb.Rds")
+model_all_pb <- readRDS(here::here("data","mod_fitted_pb.Rds"))
+
+
+
+
+
+#d <- dat
+#d$z_abs <- abs(d$z)
+#d %>% dplyr::group_by(grouped_es) %>%
+#  summarise_at(vars(z_abs), list(`median` = median,
+#                                 `mean` = mean,
+#                                 `sd` = sd))
+```
+
+Extract model coefficients that are used to judge whether a given meta-analysis has publication bias or not.
+
+```{r,warning=FALSE}
+# load pre-fitted intercept-only models
+#model_all <- readRDS(file = "mod_fitted.Rds")
+model_all <- readRDS(here::here("data","mod_fitted.Rds"))
+
+# extract model coefficients
+pb_results <- data.frame(MA_case = names(dat_list),
+                         beta0 = sapply(model_all, function(x) coef(summary(x))[1]) %>% as.numeric(), # meta-analytic means from intercept-only models
+                         beta_pb = sapply(model_all_pb, function(x) x$beta[2]),# slope of Egger's tests
+                         p_pb = sapply(model_all_pb, function(x) x$pval[2]) # null hypothesis test of the slope of Egger's tests
+                         ) 
+
+
+# whether publication bias exists
+pb_results <- pb_results %>% mutate(sig_pb = base::ifelse(p_pb < 0.1 & beta0*beta_pb > 0, "Yes", "No")) # meta-analyses with publication bias: statistically replicateicant slopes and the slopes and meta-analytic means have the same sign
+
+# add publication bias info into data
+dat$MA_case <- paste("MA", dat$meta.analysis.id, sep = "_")
+
+# combine
+d <- left_join(dat, select(pb_results,MA_case,sig_pb), by="MA_case")
+
+```
+
+
+**Plot the $z$-statistics.**
+
+```{r, warning=FALSE, echo=FALSE}
+d=subset(d,!is.na(z))
+
+ggplot(d, aes(x = z)) + 
+  geom_histogram(aes(y = ..density..), color="black", 
+                 fill="white", bins=100) +
+  xlim(-40,40) + xlab("z-value") + ylab('') + theme_bw()
+```
+
+\newpage
+### Zero-mean 4-component mixture
+
+We use the function `flexmix` and Erik's custom function to fit constrained Zero-mean 4-component mixture.
+
+We start by trying the function `flexmix` which fits unconstrained normal mixtures. We see the variance of the first component is below 1.
+
+```{r, warning=FALSE, echo=TRUE}
+# flexmix fits unconstrained normal mixtures. We choose 4 components.
+#fit=flexmix(d$z ~ 0, k=4)
+#saveRDS(fit, file = "fit.Rds")
+#fit <- readRDS(file = "fit.Rds")
+fit <- readRDS(file = "data/fit.Rds")
+
+p=summary(fit)@comptab$prior  # mixture proportions
+sigma=parameters(fit)         # note: one of the unconstrained sigma's 
+                              # is less than 1
+sigma
+```
+
+We use function `constrOptim` to run constrained optimization.
+
+Useful log likelihood function and set-up:
+
+```{r, warning=FALSE, echo=TRUE}
+# log likelihood function
+loglik = function(theta,z){
+  p=c(theta[1:3],1-sum(theta[1:3]))
+  s=theta[4:7]
+  lik=dmix(z,p,m=rep(0,4),s=s)
+  return(-sum(log(lik)))      # *minus* the log lik
+}
+
+# set up constraints for optimization
+# The feasible region is defined by ui %*% par - ci >= 0
+ui=c(-1,-1,-1,rep(0,4))         # 3 mixture props sum to < 1
+ui=rbind(ui,cbind(diag(7)))
+ci=c(-1,0,0,0,1,1,1,1)
+```
+
+**Run constrained optimization: whole dataset**
+
+```{r, warning=FALSE, echo=TRUE}
+# starting value
+theta0=c(p[1:3],pmax(sigma,1.2))
+#opt=constrOptim(theta=theta0,f=loglik,ui=ui,ci=ci,
+#                method = "Nelder-Mead",z=d$z,
+#                control=list(maxit=10^4))
+
+#saveRDS(opt, file = "opt.Rds")
+opt <- readRDS(file = "data/opt.Rds")
+
+
+# collect the results - whole dataset
+p=c(opt$par[1:3],1-sum(opt$par[1:3])) # mixture proportions
+sigma=opt$par[4:7]                    # mixture std devs
+m=rep(0,4)                            # mixture means
+df=data.frame(p,mu=m,sigma=sigma)
+round(df,2)
+```
+
+Run constrained optimization: dataset with mean difference as effect measure
+
+```{r, echo=TRUE}
+# flexmix fits unconstrained normal mixtures. We choose 4 components.
+#fit_md=flexmix(filter(d,grouped_es == "lnRR" | grouped_es == "SMD")$z ~ 0, k=4)
+#saveRDS(fit_md, file = "fit_md.Rds")
+fit_md <- readRDS(file = "data/fit_md.Rds")
+p_md=summary(fit_md)@comptab$prior  # mixture proportions
+sigma_md=parameters(fit_md)         # note: one of the unconstrained sigma's 
+                              # is less than 1
+sigma_md
+
+# starting value
+theta0=c(p_md[1:3],pmax(sigma_md,1.2))
+
+
+# dataset with mean difference (SMD & lnRR)
+#opt_md=constrOptim(theta=theta0,f=loglik,ui=ui,ci=ci,
+#                method = "Nelder-Mead",z=filter(d,grouped_es == "lnRR" | grouped_es == "SMD")$z,
+#                control=list(maxit=10^4))
+
+#saveRDS(opt_md, file = "opt_md.Rds")
+opt_md <- readRDS(file = "data/opt_md.Rds")
+
+# collect the results - publication dataset
+p_md=c(opt_md$par[1:3],1-sum(opt_md$par[1:3])) # mixture proportions
+sigma_md=opt_md$par[4:7]                    # mixture std devs
+m_md=rep(0,4)                            # mixture means
+df_md=data.frame(p_md,mu=m_md,sigma=sigma_md)
+round(df_md,2)
+```
+
+
+Run constrained optimization: dataset with correlation as effect measure
+
+```{r, echo=TRUE}
+# flexmix fits unconstrained normal mixtures. We choose 4 components.
+#fit_zr=flexmix(filter(d,grouped_es == "Zr")$z ~ 0, k=4)
+#saveRDS(fit_zr, file = "fit_zr.Rds")
+fit_zr <- readRDS(file = "data/fit_zr.Rds")
+p_zr=summary(fit_zr)@comptab$prior  # mixture proportions
+sigma_zr=parameters(fit_zr)         # note: no unconstrained sigma is 
+                                    # less than 1; but we still constrain it; the results have a slight change
+sigma_zr
+
+# starting value
+theta0=c(p_zr[1:3],pmax(sigma_zr,1.2))
+
+# dataset with correlation (Zr)
+#opt_zr=constrOptim(theta=theta0,f=loglik,ui=ui,ci=ci,
+#                method = "Nelder-Mead",z=filter(d,grouped_es == "Zr")$z,
+#                control=list(maxit=10^4))
+
+#saveRDS(opt_zr, file = "opt_zr.Rds")
+opt_zr <- readRDS(file = "data/opt_zr.Rds")
+
+# collect the results - non-publication-bias dataset
+p_zr=c(opt_zr$par[1:3],1-sum(opt_zr$par[1:3])) # mixture proportions
+sigma_zr=opt_zr$par[4:7]                    # mixture std devs
+m_zr=rep(0,4)                            # mixture means
+df_zr=data.frame(p_zr,mu=m_zr,sigma=sigma_zr)
+round(df_zr,2)
+```
+
+
+Run constrained optimization: dataset with truncation - neglect this part
+
+```{r, echo=TRUE}
+# flexmix fits unconstrained normal mixtures. We choose 4 components.
+#fit_folded=flexmix(dat_folded$z ~ 0, k=4)
+#saveRDS(fit_folded, file = "fit_folded.Rds")
+fit_folded <- readRDS(file = "data/fit_folded.Rds")
+p_folded=summary(fit_folded)@comptab$prior  # mixture proportions
+sigma_folded=parameters(fit_folded)         # note: one of the unconstrained sigma's 
+                              # is less than 1
+sigma_folded
+
+# starting value
+theta0=c(p_folded[1:3],pmax(sigma_folded,1.2))
+
+# dataset with correlation (Zr)
+#opt_folded=constrOptim(theta=theta0,f=loglik,ui=ui,ci=ci,
+#                method = "Nelder-Mead",z=dat_folded$z,
+#                control=list(maxit=10^4))
+
+#saveRDS(opt_folded, file = "opt_folded.Rds")
+opt_folded <- readRDS(file = "data/opt_folded.Rds")
+
+# collect the results - non-publication-bias dataset
+p_folded=c(opt_folded$par[1:3],1-sum(opt_folded$par[1:3])) # mixture proportions
+sigma_folded=opt_folded$par[4:7]                    # mixture std devs
+m_folded=rep(0,4)                            # mixture means
+df_folded=data.frame(p_folded,mu=m_folded,sigma=sigma_folded)
+round(df_folded,2)
+```
+
+
+\newpage
+## Estimates {.tabset} 
+
+### Z distribution and fitted mixture models
+
+We plot the histogram of the absolute $z$-statistics together with the fitted mixture. We see that the mixture fits quite well.
+
+```{r, warning=FALSE, echo=FALSE}
+# whole dataset
+x=seq(0,40,0.01)
+df=data.frame(z=x,dens=2*drop(dmix(x=x,p=p,m=m,s=sigma)))
+Fig_1A <- ggplot(d, aes(x = abs(z))) + 
+  geom_histogram(aes(y = after_stat(density)), 
+                 fill = brewer.pal(n = 8, name = "Dark2")[1], 
+                 color = brewer.pal(n = 8, name = "Dark2")[8],
+                 alpha = .3, 
+                 bins=120) +
+  #theme_cowplot() + 
+  theme_bw() + 
+  labs(x = "z-value (whole dataset)", y = "Density") + 
+  scale_fill_brewer(palette="Dark2") +
+  xlim(0,21) +
+  scale_y_continuous(labels = scales::number_format(accuracy = 0.01), 
+                     limits = c(0,0.4)
+                     ) + # need "scales" package
+  #scale_y_continuous(limits = c(0,0.2), breaks = seq(0,0.2,0.05)) + 
+  geom_line(data=df,aes(x=z,y=dens),color = "black", alpha=1, linewidth = 0.5) +
+  theme(axis.title = element_text(size = 14, colour = "black"),
+        axis.text = element_text(size = 14, colour = "black"))
+ 
+
+# dataset with md
+x=seq(0,40,0.01)
+df=data.frame(z=x,dens=2*drop(dmix(x=x,p=p_md,m=m_md,s=sigma_md)))
+Fig_1A_md <- ggplot(filter(d,grouped_es == "lnRR" | grouped_es == "SMD"), aes(x = abs(z))) + 
+  geom_histogram(aes(y = after_stat(density)), 
+                 fill = brewer.pal(n = 8, name = "Dark2")[1], 
+                 color = brewer.pal(n = 8, name = "Dark2")[8],
+                 alpha = .3, 
+                 bins=120) +
+  #theme_cowplot() + 
+  theme_bw() + 
+  labs(x = "z-value (mean difference)", y = "Density") + 
+  scale_fill_brewer(palette="Dark2") +
+  xlim(0,21) +
+  scale_y_continuous(labels = scales::number_format(accuracy = 0.01), 
+                     limits = c(0,0.4)
+                     ) + # need "scales" package
+  #scale_y_continuous(limits = c(0,0.2), breaks = seq(0,0.2,0.05)) + 
+  geom_line(data=df,aes(x=z,y=dens),color = "black", alpha=1, linewidth = 0.5) +
+  theme(axis.title = element_text(size = 14, colour = "black"),
+        axis.text = element_text(size = 14, colour = "black"))
+
+
+# dataset with zr
+x=seq(0,40,0.01)
+df=data.frame(z=x,dens=2*drop(dmix(x=x,p=p_zr,m=m_zr,s=sigma_zr)))
+Fig_1A_zr <- ggplot(filter(d,grouped_es == "Zr"), aes(x = abs(z))) + 
+  geom_histogram(aes(y = after_stat(density)), 
+                 fill = brewer.pal(n = 8, name = "Dark2")[1], 
+                 color = brewer.pal(n = 8, name = "Dark2")[8],
+                 alpha = .3, 
+                 bins=120) +
+  #theme_cowplot() + 
+  theme_bw() + 
+  labs(x = "z-value (correlation)", y = "Density") + 
+  scale_fill_brewer(palette="Dark2") +
+  xlim(0,21) +
+  scale_y_continuous(labels = scales::number_format(accuracy = 0.01), 
+                     limits = c(0,0.4)
+                     ) + # need "scales" package
+  #scale_y_continuous(limits = c(0,0.2), breaks = seq(0,0.2,0.05)) + 
+  geom_line(data=df,aes(x=z,y=dens),color = "black", alpha=1, linewidth = 0.5) +
+  theme(axis.title = element_text(size = 14, colour = "black"),
+        axis.text = element_text(size = 14, colour = "black"))
+
+```
+
+
+```{r,warning=FALSE,message=FALSE}
+library(patchwork)
+#png(filename = "./Fig1A (pb).png", width = 15, height = 5, units = "in", type = "windows", res = 400)
+Fig_1A + Fig_1A_md + Fig_1A_zr + plot_layout(ncol = 3) + plot_annotation(tag_levels = "A")
+# dev.off()
+```
+
+
+### Power
+
+The power against the _true_ effect (not to be confused with the "observed" of "post hoc" power) is a function of the SNR:
+
+$$\text{power(SNR)}=\Phi(-1.96 - \text{SNR}) + 1 - \Phi(1.96 - \text{SNR}).$$
+So, we can obtain the distribution of the power by transforming the distribution of the SNR.
+
+Based on the estimated distribution of the SNR, the average power can be calculated.
+
+**Power summary for the whole dataset:**
+
+```{r}
+# whole dataset
+snr=rmix(10^5,p=p,m=m,s=sqrt(sigma^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+summary(power)
+```
+
+**Power summary for the dataset with md:**
+
+```{r}
+# dataset with md
+snr=rmix(10^5,p=p_md,m=m_md,s=sqrt(sigma_md^2 - 1))
+power_md=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+summary(power_md)
+```
+
+**Power summary for the dataset with zr:**
+
+```{r}
+# dataset with zr
+snr=rmix(10^5,p=p_zr,m=m_zr,s=sqrt(sigma_zr^2 - 1))
+power_zr=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+summary(power_zr)
+```
+
+
+**Power distribution for whole dataset, dataset using mean difference, and that using correlation:**
+
+```{r, warning=FALSE,echo=FALSE}
+# whole dataset
+df=data.frame(power=power)
+power.dist <- ggplot(df, aes(x=power, y=after_stat(density))) +
+  geom_histogram(bins=40,fill="white",col="black") + 
+  scale_x_continuous(breaks = seq(0,1,0.1)) +
+  theme_bw() + labs(x="power (whole dataset)",y="")
+
+# dataset with md
+df=data.frame(power=power_md)
+power.dist_md <- ggplot(df, aes(x=power, y=after_stat(density))) +
+  geom_histogram(bins=40,fill="white",col="black") + 
+  scale_x_continuous(breaks = seq(0,1,0.1)) +
+  theme_bw() + labs(x="power (mean difference)",y="")
+
+# dataset with zr
+df=data.frame(power=power_zr)
+power.dist_zr <- ggplot(df, aes(x=power, y=after_stat(density))) +
+  geom_histogram(bins=40,fill="white",col="black") + 
+  scale_x_continuous(breaks = seq(0,1,0.1)) +
+  theme_bw() + labs(x="power (correlation)",y="")
+
+power.dist + power.dist_md + power.dist_zr + plot_layout(ncol = 3) + plot_annotation(tag_levels = "A")
+
+```
+
+
+### Type M error
+
+We define the exaggeration as
+
+$$\left| \frac{b}{\beta} \right| = \left| \frac{z}{\text{SNR}} \right|$$
+
+**Summary of exaggeration for the whole dataset:**
+
+```{r}
+# whole dataset
+snr=rmix(10^5,p=p,m=m,s=sqrt(sigma^2 - 1))
+z=snr + rnorm(10^5)
+z.abs=abs(z)
+exaggeration=abs(z/snr)
+median(exaggeration)                # unconditional median exaggeration
+median(exaggeration[abs(z)>1.96])   # median exaggeration conditionally on |z|>1.96 
+```
+
+
+**Summary of exaggeration for the dataset with md:**
+
+```{r}
+# dataset with md
+snr_md=rmix(10^5,p=p_md,m=m_md,s=sqrt(sigma_md^2 - 1))
+z_md=snr_md + rnorm(10^5)
+z.abs_md=abs(z_md)
+exaggeration_md=abs(z_md/snr_md)
+median(exaggeration_md)                # unconditional median exaggeration
+median(exaggeration_md[abs(z_md)>1.96])   # median exaggeration conditionally on |z|>1.96 
+```
+
+**Summary of exaggeration for the dataset with zr:**
+
+```{r}
+# dataset with zr
+snr_zr=rmix(10^5,p=p_zr,m=m_zr,s=sqrt(sigma_zr^2 - 1))
+z_zr=snr_zr + rnorm(10^5)
+z.abs_zr=abs(z_zr)
+exaggeration_zr=abs(z_zr/snr_zr)
+median(exaggeration_zr)                # unconditional median exaggeration
+median(exaggeration_zr[abs(z_zr)>1.96])   # median exaggeration conditionally on |z|>1.96
+
+```
+
+We can also compute the quartiles. Below is the example using the whole dataset.
+
+```{r}
+quantile(exaggeration,probs=c(0.25,0.5,0.75))               # unconditional quartiles
+quantile(exaggeration[abs(z)>1.96],probs=c(0.25,0.5,0.75))  # conditional quartiles
+```
+
+
+We can also compute the conditional median of the exaggeration given the observed (absolute) $z$-statistic exactly. Let us denote the joint density of SNR and the $z$-statistic by $f$. The symmetry of the distribution of the $z$-statistic together with the fact that the $z$-statistic is the SNR plus standard normal noise implies that for every $x$ and $y$  
+$$f(x,y) = f(-x,-y)$$
+This implies that the conditional distribution of $|Z/\text{SNR}|$ given $|Z|=z$ is equal to the conditional distribution given $Z=z$ (and also equal to the conditional distribution given $Z=-z$). The conditional distribution of the SNR given $Z$ is again a mixture of normals.
+
+Now we can compute the conditional quartiles.
+
+**Summary of conditional median exaggeration for the whole dataset:**
+
+```{r, echo=TRUE}
+z=seq(0,5,0.01)
+quartiles=data.frame(z,Q25=NA,Q50=NA,Q75=NA)
+s=sqrt(sigma^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p,m,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  quartiles[i,2:4]=qmixabs(q=c(0.25,0.5,0.75),p=pp,m=pm,s=ps)
+}
+df=quartiles %>% pivot_longer(!z, names_to = "quartile")
+df$exaggeration=df$z/df$value
+summary(df$exaggeration)
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+#df = filter(df,z>qnorm(0.05/2,lower.tail = F))
+M.dist <- ggplot(df,aes(x=z,y=exaggeration,color=quartile)) +
+  geom_line() +
+  geom_hline(yintercept=1)+
+  ylab("Exaggeration") + xlab("|z| (whole dataset)") +
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 4, by = 0.5),minor_breaks=seq(0, 4, by = 0.25)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0, 5, by = 0.25)) +
+  theme_bw() + theme(legend.position = "top") #+ xlim(c(qnorm(0.05/2,lower.tail = F), 5)) 
+```
+
+
+**Summary of conditional median exaggeration for the dataset with md:**
+```{r, echo=TRUE}
+z=seq(0,5,0.01)
+quartiles=data.frame(z,Q25=NA,Q50=NA,Q75=NA)
+s=sqrt(sigma_md^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_md,m_md,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  quartiles[i,2:4]=qmixabs(q=c(0.25,0.5,0.75),p=pp,m=pm,s=ps)
+}
+df=quartiles %>% pivot_longer(!z, names_to = "quartile")
+df$exaggeration=df$z/df$value
+summary(df$exaggeration)
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+M.dist_md <- ggplot(df,aes(x=z,y=exaggeration,color=quartile)) +
+  geom_line() +
+  geom_hline(yintercept=1)+
+  ylab("Exaggeration") + xlab("|z| (mean difference)") +
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 4, by = 0.5),minor_breaks=seq(0, 4, by = 0.25)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0, 5, by = 0.25)) +
+  theme_bw() + theme(legend.position = "top")
+```
+
+**Summary of conditional median exaggeration for the dataset with zr:**
+```{r, echo=TRUE}
+z=seq(0,5,0.01)
+quartiles=data.frame(z,Q25=NA,Q50=NA,Q75=NA)
+s=sqrt(sigma_zr^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_zr,m_zr,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  quartiles[i,2:4]=qmixabs(q=c(0.25,0.5,0.75),p=pp,m=pm,s=ps)
+}
+df=quartiles %>% pivot_longer(!z, names_to = "quartile")
+df$exaggeration=df$z/df$value
+summary(df$exaggeration)
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+M.dist_zr <- ggplot(df,aes(x=z,y=exaggeration,color=quartile)) +
+  geom_line() +
+  geom_hline(yintercept=1)+
+  ylab("Exaggeration") + xlab("|z| (correlation)") +
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 4, by = 0.5),minor_breaks=seq(0, 4, by = 0.25)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0, 5, by = 0.25)) +
+  theme_bw() + theme(legend.position = "top")
+```
+
+
+Relevant distributions for the whole dataset, dataset using mean difference, dataset using correlation:
+```{r,echo=FALSE, warning=FALSE}
+M.dist + M.dist_md + M.dist_zr + plot_layout(ncol = 3) + plot_annotation(tag_levels = "A")
+```
+
+We notice how the 75% percentile (upper quartile) goes off the chart. This is due to the fact that we have estimated that 19% of the effects are exactly zero. If, for example, the observed $z$-statistic is 1 then the conditional probability that the effect is zero exceeds 25% so that the conditional upper quartile of the exaggeration is infinite.
+
+I suspect that the estimate of the upper quartile of the exaggeration is not very accurate. Hopefully, we will be able to provide a confidence band. 
+
+\newpage
+### Coverage
+
+The coverage event is
+
+$$b - 1.96 \cdot s < \beta < b + 1.96 \cdot s$$
+which is of course equivalent to
+
+$$z - 1.96 < \text{SNR} < z + 1.96$$
+
+We can easily compute the coverage probability unconditionally and conditionally on the event $|z|>1.96$.
+
+**Summary of coverage for the whole dataset:**
+
+```{r}
+snr=rmix(10^5,p=p,m=m,s=sqrt(sigma^2 - 1))
+z=snr + rnorm(10^5)
+cover=abs(z-snr) < 1.96
+mean(cover)               # unconditional coverage
+mean(cover[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+The unconditional probability is exactly 95% because the assumption of normality and known standard error are exactly true in the simulation.
+
+We can compute the conditional coverage given the observed absolute $z$-statistic. Again, the symmetry of the distribution of the $z$-statistic implies that the conditional probability of the coverage event given $|Z|=z$ is equal to the conditional probability given $Z=z$.
+
+
+**Summary of coverage for the whole dataset:**
+
+```{r, echo=TRUE}
+z=sort(abs(d$z))
+coverage=rep(NA,length(z))
+s=sqrt(sigma^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p,m,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  coverage[i]=pmix(z[i]+1.96,p=pp,m=pm,s=ps) - 
+    pmix(z[i]-1.96,p=pp,m=pm,s=ps)
+}
+```
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,coverage)
+coverage.dist <- ggplot(data=df, aes(x = z, y = coverage)) +
+  geom_line() +
+  geom_hline(yintercept=0.95,linetype = "dashed")+
+  scale_y_continuous(limits = c(0.8, 1), breaks = seq(0.8, 1, by = 0.05),
+                     minor_breaks=seq(0.8,1,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Coverage") + xlab("|z| (whole dataset)") + labs(colour = NULL) + theme_bw()
+```
+
+The drop in coverage at 1.96 is a result of the atom at zero of the distribution of the SNR.
+
+We can verify the unconditional and conditional coverage by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(coverage)                 # unconditional coverage
+mean(coverage[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+
+**Summary of coverage for the dataset with md:**
+
+```{r}
+snr=rmix(10^5,p=p_md,m=m_md,s=sqrt(sigma_md^2 - 1))
+z=snr + rnorm(10^5)
+cover=abs(z-snr) < 1.96
+mean(cover)               # unconditional coverage
+mean(cover[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+
+**Summary of coverage for the dataset with md:**
+```{r, echo=TRUE}
+z=sort(abs(filter(d,grouped_es == "lnRR" | grouped_es == "SMD")$z))
+coverage=rep(NA,length(z))
+s=sqrt(sigma_md^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_md,m_md,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  coverage[i]=pmix(z[i]+1.96,p=pp,m=pm,s=ps) - 
+    pmix(z[i]-1.96,p=pp,m=pm,s=ps)
+}
+```
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,coverage)
+coverage.dist_md <- ggplot(data=df, aes(x = z, y = coverage)) +
+  geom_line() +
+  geom_hline(yintercept=0.95,linetype = "dashed")+
+  scale_y_continuous(limits = c(0.8, 1), breaks = seq(0.8, 1, by = 0.05),
+                     minor_breaks=seq(0.8,1,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Coverage") + xlab("|z| (mean difference)") + labs(colour = NULL) + theme_bw()
+```
+
+We can verify the unconditional and conditional coverage by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(coverage)                 # unconditional coverage
+mean(coverage[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+
+**Summary of coverage for the dataset with zr:**
+
+```{r}
+snr=rmix(10^5,p=p_zr,m=m_zr,s=sqrt(sigma_zr^2 - 1))
+z=snr + rnorm(10^5)
+cover=abs(z-snr) < 1.96
+mean(cover)               # unconditional coverage
+mean(cover[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+
+**Summary of coverage for the dataset zr:**
+
+```{r, echo=TRUE}
+z=sort(abs(filter(d,grouped_es == "Zr")$z))
+coverage=rep(NA,length(z))
+s=sqrt(sigma_zr^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_zr,m_zr,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  coverage[i]=pmix(z[i]+1.96,p=pp,m=pm,s=ps) - 
+    pmix(z[i]-1.96,p=pp,m=pm,s=ps)
+}
+```
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,coverage)
+coverage.dist_zr <- ggplot(data=df, aes(x = z, y = coverage)) +
+  geom_line() +
+  geom_hline(yintercept=0.95,linetype = "dashed")+
+  scale_y_continuous(limits = c(0.8, 1), breaks = seq(0.8, 1, by = 0.05),
+                     minor_breaks=seq(0.8,1,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Coverage") + xlab("|z| (correlation)") + labs(colour = NULL) + theme_bw()
+```
+
+
+Relevant distributions for the whole dataset, dataset using mean difference, dataset using correlation:
+```{r}
+coverage.dist + coverage.dist_md + coverage.dist_zr + plot_layout(ncol = 3) + plot_annotation(tag_levels = "A")
+```
+
+
+
+\newpage
+### Type S error
+@gelman2000type define the Type S error when an estimate is statistically replicateicant, but has the wrong sign (see also @gelman2014beyond). We can easily compute the probability of a Type S error using simulation.
+
+**The mean sign error for the whole dataset:**
+
+```{r}
+snr=rmix(10^5,p=p,m=m,s=sqrt(sigma^2 - 1))
+z=snr + rnorm(10^5)
+z.abs=abs(z)
+s.error=(z * snr) < 0
+mean(s.error)               # unconditional probability of a sign error
+mean(s.error[z.abs>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+
+**The mean sign error for the dataset with md:**
+
+```{r}
+snr=rmix(10^5,p=p_md,m=m_md,s=sqrt(sigma_md^2 - 1))
+z=snr + rnorm(10^5)
+z.abs=abs(z)
+s.error_md=(z * snr) < 0
+mean(s.error_md)               # unconditional probability of a sign error
+mean(s.error_md[abs(z.abs)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+
+**The mean sign error for the dataset with zr:**
+
+```{r}
+snr=rmix(10^5,p=p_zr,m=m_zr,s=sqrt(sigma_zr^2 - 1))
+z=snr + rnorm(10^5)
+z.abs=abs(z)
+s.error_zr=(z * snr) < 0
+mean(s.error_zr)               # unconditional probability of a sign error
+mean(s.error_zr[abs(z.abs)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+
+We can also compute the conditional probability of a sign error, given the observed absolute $z$-statistic. Again, the symmetry of the distribution of the $z$-statistic implies that the conditional probability that the signs of the SNR and the $z$-statistic agree given $|Z|=z$ is equal to the conditional probability given $Z=z$.
+
+**Conditional probability of the sign error for the whole dataset:**
+
+```{r, echo=TRUE}
+z=sort(abs(d$z))
+error=rep(NA,length(z))
+s=sqrt(sigma^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p,m,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  error[i]=pmix(0,p=pp,m=pm,s=ps)
+}
+
+```
+
+We can verify the unconditional and conditional probability of a sign error by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(error)                 # unconditional probability of a sign error / marginal probability of a sign error
+mean(error[abs(z)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,error)
+error.dist <- ggplot(data=df, aes(x = z, y = error)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, by = 0.05),
+                     minor_breaks=seq(0,0.5,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Sign error") + xlab("|z| (whole dataset)") + labs(colour = NULL) + theme_bw()
+```
+
+
+**Conditional probability of the sign error for the dataset using mean difference:**
+
+```{r, echo=TRUE}
+z=sort(abs(filter(d,grouped_es == "lnRR" | grouped_es == "SMD")$z))
+error=rep(NA,length(z))
+s=sqrt(sigma_md^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_md,m_md,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  error[i]=pmix(0,p=pp,m=pm,s=ps)
+}
+
+```
+
+We can verify the unconditional and conditional probability of a sign error by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(error)                 # unconditional probability of a sign error / marginal probability of a sign error
+mean(error[abs(z)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,error)
+error.dist_md <- ggplot(data=df, aes(x = z, y = error)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, by = 0.05),
+                     minor_breaks=seq(0,0.5,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Sign error") + xlab("|z| (mean difference)") + labs(colour = NULL) + theme_bw()
+```
+
+
+**Conditional probability of the sign error for the dataset using correlation:**
+
+```{r, echo=TRUE}
+z=sort(abs(filter(d,grouped_es == "Zr")$z))
+error=rep(NA,length(z))
+s=sqrt(sigma_zr^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_zr,m_zr,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  error[i]=pmix(0,p=pp,m=pm,s=ps)
+}
+```
+
+We can verify the unconditional and conditional probability of a sign error by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(error)                 # unconditional probability of a sign error / marginal probability of a sign error
+mean(error[abs(z)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,error)
+error.dist_zr <- ggplot(data=df, aes(x = z, y = error)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, by = 0.05),
+                     minor_breaks=seq(0,0.5,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Sign error") + xlab("|z| (correlation)") + labs(colour = NULL) + theme_bw()
+```
+
+Relevant distributions for the whole dataset, dataset using mean difference, dataset using correlation:
+```{r}
+error.dist + error.dist_md + error.dist_zr + plot_layout(ncol = 3) + plot_annotation(tag_levels = "A")
+```
+
+
+\newpage
+### Replication
+
+Consider the event that an _exact_ replication study reaches statistical significance in the same direction as the original study, i.e.
+
+$$ z \times z_{\text{repl}} > 0 \ \ \text{and}\ \  |z_{\text{repl}}| > 1.96$$
+
+We can easily compute the replication probability using simulation.
+
+**Mean replication for the whole dataset:**
+
+```{r, echo=TRUE}
+# whole dataset
+snr=rmix(10^5,p=p,m=m,s=sqrt(sigma^2 - 1))
+z.orig=snr + rnorm(10^5) # original
+z.repl = snr + rnorm(10^5) # replication
+replicate=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate)                    # unconditional probability of replication
+mean(replicate[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+**Mean replication for the dataset with md:**
+
+```{r, echo=TRUE}
+# dataset with md
+snr=rmix(10^5,p=p_md,m=m_md,s=sqrt(sigma_md^2 - 1))
+z.orig=snr + rnorm(10^5) # original
+z.repl = snr + rnorm(10^5) # replication
+replicate=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate)                    # unconditional probability of replication
+mean(replicate[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+
+**Mean replication for the dataset with zr:**
+
+```{r, echo=TRUE}
+# dataset with zr
+snr=rmix(10^5,p=p_zr,m=m_md,s=sqrt(sigma_md^2 - 1))
+z.orig=snr + rnorm(10^5) # original
+z.repl = snr + rnorm(10^5) # replication
+replicate=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate)                    # unconditional probability of replication
+mean(replicate[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+We can compute the conditional probability of "successful replication" given the absolute value of the $z$-statistic of the original study. Again, the symmetry of the distribution of the $z$-statistic implies that the conditional probability of "successful replication" given $|Z|=z$ is equal to the conditional probability given $Z=z$.
+
+
+**Conditional probability of "successful replication" for the whole dataset:**
+
+```{r, echo=FALSE, warning=FALSE}
+# z vs. replication
+z=sort(abs(d$z))
+test = d[order(abs(d$z)),]
+
+replicate=rep(NA,length(z))
+s=sqrt(sigma^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p,m,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  replicate[i]=1 - pmix(1.96,p=pp,m=pm,s=sqrt(ps^2 +1))
+}
+
+
+# will be used for mode estimation
+df_mode=data.frame(z,replicate,grouped_es = test$grouped_es,study.year=test$study.year)
+```
+
+We can verify the unconditional and conditional probability of "successful replication" by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(replicate)               # unconditional probability of replication
+mean(replicate[abs(z)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,replicate)
+replicate.dist <- ggplot(data=df, aes(x = z, y = replicate)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                     minor_breaks=seq(0,1,0.05)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Replicate") + xlab("|z| (Whole dataset)") + labs(colour = NULL) + theme_bw()
+```
+
+**Conditional probability of "successful replication" for the dataset with md:**
+
+```{r, echo=FALSE, warning=FALSE}
+# z vs. replication
+z=sort(abs(filter(d,grouped_es == "lnRR" | grouped_es == "SMD")$z))
+replicate=rep(NA,length(z))
+s=sqrt(sigma_md^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_md,m_md,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  replicate[i]=1 - pmix(1.96,p=pp,m=pm,s=sqrt(ps^2 +1))
+}
+
+
+# will be used for mode estimation
+df_mode_md=data.frame(z,replicate)
+```
+
+```{r, echo=TRUE}
+mean(replicate)               # unconditional probability of replication
+mean(replicate[abs(z)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,replicate)
+replicate.dist_md <- ggplot(data=df, aes(x = z, y = replicate)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                     minor_breaks=seq(0,1,0.05)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Replicate") + xlab("|z| (mean difference)") + labs(colour = NULL) + theme_bw()
+
+```
+
+
+**Conditional probability of "successful replication" for the dataset with zr:**
+
+```{r, echo=FALSE, warning=FALSE}
+# z vs. replication
+z=sort(abs(filter(d,grouped_es == "Zr")$z))
+replicate=rep(NA,length(z))
+s=sqrt(sigma_zr^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_zr,m_zr,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  replicate[i]=1 - pmix(1.96,p=pp,m=pm,s=sqrt(ps^2 +1))
+}
+
+# will be used for mode estimation
+df_mode_zr=data.frame(z,replicate)
+```
+
+```{r, echo=TRUE}
+mean(replicate)               # unconditional probability of replication
+mean(replicate[abs(z)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,replicate)
+replicate.dist_zr <- ggplot(data=df, aes(x = z, y = replicate)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                     minor_breaks=seq(0,1,0.05)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Replicate") + xlab("|z| (Correlation)") + labs(colour = NULL) + theme_bw()
+
+```
+
+
+Relevant distributions for the whole dataset, dataset using mean difference, dataset using correlation:
+```{r}
+replicate.dist + replicate.dist_md + replicate.dist_zr + plot_layout(ncol = 3) + plot_annotation(tag_levels = "A")
+```
+
+### Mode of replication
+
+Estimate the most frequent z value and corresponding replication rate
+
+Whole dataset:
+```{r,warning=FALSE, echo=TRUE, fig.height=5, fig.width=8}
+
+# https://search.r-project.org/CRAN/refmans/coda/html/mcmc.html
+# https://rdrr.io/cran/MCMCglmm/man/posterior.mode.html
+# https://www.statology.org/mode-in-r/
+# the mode of z value
+z.mcmc <- as.mcmc(df_mode$z[which(df_mode$z > 1.96)])
+
+#----------------not run----------------#
+# calculate skewness and kurtosis - https://www.statology.org/skewness-kurtosis-in-r/#:~:text=To%20calculate%20the%20skewness%20and%20kurtosis%20of%20this,and%20the%20kurtosis%20turns%20out%20to%20be%204.177865.
+#moments::skewness(z.mcmc)
+#moments::kurtosis(z.mcmc)
+#moments::jarque.test(as.vector(z.mcmc))
+
+
+# Split the dataframe by 'year' and convert 'value' into MCMC objects
+#z.mcmc_list <- lapply(split(filter(df_mode, z > 1.96)$z, filter(df_mode, z > 1.96)$study.year), as.mcmc)
+
+# Calculate the mode of each MCMC object in mcmc_list
+#modes <- lapply(z.mcmc_list, posterior.mode)
+# Function to calculate mode while handling cases with fewer than 10 data points
+#calculate_mode <- function(mcmc_object) {
+#  if (length(mcmc_object) < 5) {
+#    return(NA)  # or another appropriate value
+#  } else {
+#    return(posterior.mode(mcmc_object)[[1]])
+#  }
+#}
+
+# Function to calculate medium while handling cases with fewer than 10 data points
+#calculate_median <- function(mcmc_object) {
+#  if (length(mcmc_object) < 5) {
+#    return(NA)  # or another appropriate value
+#  } else {
+#    return(median(mcmc_object)[[1]])
+#  }
+#}
+
+# Calculate the mode for each MCMC object in mcmc_list
+#z.modes <- lapply(z.mcmc_list, calculate_mode) %>% unlist()
+
+#modes.dat <- data.frame(year = names(z.modes), modes = z.modes)
+
+#plot(modes.dat$year,modes.dat$modes,xlim=c(1990, 2020),ylim=c(1.5,4))
+#----------------not run----------------#
+
+
+
+#---------------------investigation of bandwidth---------------------#
+# function to estimate bandwidth - the default method of density()
+# three common methods to select bandwidth - https://r-coder.com/density-plot-r/
+# https://stat.ethz.ch/R-manual/R-devel/library/stats/html/bandwidth.html
+#bw <- function (x) 
+#{
+#    if (length(x) < 2L) 
+#        stop("need at least 2 data points")
+#    hi <- sd(x)
+#    if (!(lo <- min(hi, IQR(x)/1.34)))    #if IQR=0, use sd(), abs(x[1L]) or 1 as bw
+#        (lo <- hi) || (lo <- abs(x[1L])) || (lo <- 1)
+#    0.9 * lo * length(x)^(-0.2)
+#}
+
+# Rule of thumb
+#density(z.mcmc)$bw
+#density(z.mcmc)$x[density(z.mcmc)$y==max(density(z.mcmc)$y)]
+# Unbiased cross validation
+#density(z.mcmc, bw = bw.ucv(z.mcmc))$bw
+#density(z.mcmc, bw = bw.ucv(z.mcmc))$x[density(z.mcmc, bw = bw.ucv(z.mcmc))$y==max(density(z.mcmc, bw = bw.ucv(z.mcmc))$y)]
+# Plug-in
+#density(z.mcmc, bw = bw.SJ(z.mcmc))$bw
+#density(z.mcmc, bw = bw.SJ(z.mcmc))$x[density(z.mcmc, bw = bw.SJ(z.mcmc))$y==max(density(z.mcmc, bw = bw.SJ(z.mcmc))$y)]
+#---------------------investigation of bandwidth---------------------#
+
+
+#density(z.mcmc)$x[density(z.mcmc)$y==max(density(z.mcmc)$y)] # manual way - 
+# https://math.stackexchange.com/questions/3929668/statistic-mode-on-continuous-data
+
+df_mode[round(df_mode$z,4) == round(posterior.mode(z.mcmc,adjust = 1),4),][1,]
+
+kd <- density(df_mode$z[which(df_mode$z > 1.96)])
+#create kernel density plot
+#plot(kd)
+
+# density of replication rate
+#kd <- density(df_mode$replicate[which(df_mode$z > 1.96)])
+#plot(kd)
+
+kd.xy <- data.frame(x = kd$x, y = kd$y)
+kd.mode <- kd.xy[kd.xy$y == max(kd.xy$y),]
+
+
+# visualization
+df=df_mode
+mode_rot = density(z.mcmc)$x[density(z.mcmc)$y==max(density(z.mcmc)$y)] # or posterior.mode(z.mcmc,adjust = 1) 
+mode_ucv = density(z.mcmc, bw = bw.ucv(z.mcmc))$x[density(z.mcmc, bw = bw.ucv(z.mcmc))$y==max(density(z.mcmc, bw = bw.ucv(z.mcmc))$y)]
+mode_sj = density(z.mcmc, bw = bw.SJ(z.mcmc))$x[density(z.mcmc, bw = bw.SJ(z.mcmc))$y==max(density(z.mcmc, bw = bw.SJ(z.mcmc))$y)]
+
+df=filter(df, z > 1.96)
+replicate.dist <- ggplot(data=filter(df, z > 1.96), aes(x = z, y = replicate)) + 
+  geom_point(color = "transparent") +
+  geom_line(color = "#1B9E77") + 
+  #geom_smooth(method = stats::loess, formula= y ~ x, se = FALSE) + 
+  geom_vline(xintercept = mode_rot, color = "black", linetype = "dashed") + 
+  geom_vline(xintercept = mode_ucv, color = "red", linetype = "dashed") + 
+  geom_vline(xintercept = mode_sj, color = "blue", linetype = "dashed") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                     minor_breaks=seq(0,1,0.05)) +
+  xlim(c(qnorm(0.05/2,lower.tail = F), 20)) + 
+  #scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),minor_breaks=seq(0,5,0.25)) +
+  ylab("Replicate") + xlab("|z| (Whole dataset)") + labs(colour = NULL, title = "") + theme_bw()
+
+
+#png(filename = "z-curve/z vs replicate (data aggregation).png", width = 5, height = 5, units = "in", type = "windows", res = 400)
+ggMarginal(replicate.dist, type = "density", margins = "x", groupColour = F, groupFill = F, col = "#1B9E77", fill = "#1B9E77", alpha = 0.3)
+#dev.off()
+```
+
+
+Dataset with md:
+```{r, warning=FALSE, echo=TRUE, fig.height=5, fig.width=8}
+z.mcmc <- as.mcmc(df_mode_md$z[which(df_mode_md$z > 1.96)])
+df_mode_md[round(df_mode_md$z,4) == round(posterior.mode(z.mcmc, adjust = 1),4),][1,]
+
+#z.mcmc_md <- as.mcmc(filter(df_mode,grouped_es == "lnRR" | grouped_es == "SMD")$z[which(filter(df_mode,grouped_es == "lnRR" | grouped_es == "SMD")$z > 1.96)])
+
+# visualization
+df=df_mode_md
+mode_rot = density(z.mcmc)$x[density(z.mcmc)$y==max(density(z.mcmc)$y)]
+mode_ucv = density(z.mcmc, bw = bw.ucv(z.mcmc))$x[density(z.mcmc, bw = bw.ucv(z.mcmc))$y==max(density(z.mcmc, bw = bw.ucv(z.mcmc))$y)]
+mode_sj = density(z.mcmc, bw = bw.SJ(z.mcmc))$x[density(z.mcmc, bw = bw.SJ(z.mcmc))$y==max(density(z.mcmc, bw = bw.SJ(z.mcmc))$y)]
+
+df=filter(df, z > 1.96)
+replicate.dist_md <- ggplot(data=filter(df, z > 1.96), aes(x = z, y = replicate)) + 
+  geom_point(color = "transparent") +
+  geom_line(color = "#1B9E77") + 
+  #geom_smooth(method = stats::loess, formula= y ~ x, se = FALSE) + 
+  geom_vline(xintercept = mode_rot, color = "black", linetype = "dashed") + 
+  geom_vline(xintercept = mode_ucv, color = "red", linetype = "dashed") + 
+  geom_vline(xintercept = mode_sj, color = "blue", linetype = "dashed") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                     minor_breaks=seq(0,1,0.05)) +
+  xlim(c(qnorm(0.05/2,lower.tail = F), 20)) + 
+  #scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),minor_breaks=seq(0,5,0.25)) +
+  ylab("Replicate") + xlab("|z| (mean difference)") + labs(colour = NULL, title = "") + theme_bw()
+
+
+#png(filename = "z-curve/z vs replicate (data aggregation).png", width = 5, height = 5, units = "in", type = "windows", res = 400)
+ggMarginal(replicate.dist_md, type = "density", margins = "x", groupColour = F, groupFill = F, col = "#1B9E77", fill = "#1B9E77", alpha = 0.3)
+#dev.off()
+```
+
+Dataset without correlation:
+```{r, warning=FALSE, echo=TRUE, fig.height=5, fig.width=8}
+z.mcmc <- mcmc(df_mode_zr$z[which(df_mode_zr$z > 1.96)])
+#z.mcmc_zr <- as.mcmc(filter(df_mode,grouped_es == "Zr")$z[which(filter(df_mode,grouped_es == "Zr")$z > 1.96)])
+#z.mcmc_uncom <- as.mcmc(filter(df_mode,grouped_es == "uncommon")$z[which(filter(df_mode,grouped_es == "uncommon")$z > 1.96)])
+
+
+#HPDinterval(z.mcmc, prob = 0.5)
+df_mode_zr[round(df_mode_zr$z,3) == round(posterior.mode(z.mcmc,adjust = 1),3),][1,]
+
+#kd <- density(df_mode_zr$z[which(df_mode_zr$z > 1.96)])
+#densplot(z.mcmc)
+# bandwidth: https://stats.stackexchange.com/questions/290540/bandwidth-calculation-for-density-function#:~:text=The%20standard%20bandwidth%20function%20used,by%20density%20%28%29%20is%20bw.nrd0%20%28%29.
+
+
+# visualization
+df=df_mode_zr
+mode_rot = density(z.mcmc)$x[density(z.mcmc)$y==max(density(z.mcmc)$y)]
+mode_ucv = density(z.mcmc, bw = bw.ucv(z.mcmc))$x[density(z.mcmc, bw = bw.ucv(z.mcmc))$y==max(density(z.mcmc, bw = bw.ucv(z.mcmc))$y)]
+mode_sj = density(z.mcmc, bw = bw.SJ(z.mcmc))$x[density(z.mcmc, bw = bw.SJ(z.mcmc))$y==max(density(z.mcmc, bw = bw.SJ(z.mcmc))$y)]
+
+df = filter(df, z > 1.96)
+replicate.dist_zr <- ggplot(data=df, aes(x = z, y = replicate)) + 
+  geom_point(color = "transparent") +
+  geom_line(color = "#1B9E77") + 
+  #geom_smooth(method = stats::loess, formula= y ~ x, se = FALSE) + 
+  geom_vline(xintercept = mode_rot, color = "black", linetype = "dashed") + 
+  geom_vline(xintercept = mode_ucv, color = "red", linetype = "dashed") + 
+  geom_vline(xintercept = mode_sj, color = "blue", linetype = "dashed") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                     minor_breaks=seq(0,1,0.05)) +
+  xlim(c(qnorm(0.05/2,lower.tail = F), 20)) + 
+  #scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),minor_breaks=seq(0,5,0.25)) +
+  ylab("Replicate") + xlab("|z| (correlation)") + labs(colour = NULL, title = "") + theme_bw()
+
+
+#png(filename = "z-curve/z vs replicate (data aggregation).png", width = 5, height = 5, units = "in", type = "windows", res = 400)
+ggMarginal(replicate.dist_zr, type = "density", margins = "x", groupColour = F, groupFill = F, col = "#1B9E77", fill = "#1B9E77", alpha = 0.3)
+#dev.off()
+```
+
+
+# Aggregation: handing dependent effect sizes {.tabset} 
+
+Effect sizes and sampling variances were aggregated, assuming a constant within-study correlation of 0.5.
+
+## Cleaning and modelling
+
+### Pre-process
+
+```{r, warning=FALSE, echo=TRUE}
+#-----------------------not run-------------------------------
+#dat_list <- readRDS(here("data","dat_list.Rds"))
+
+#dat_esc <- NA
+#for (i in 1:length(dat_list)) {
+#  dat_esc[i] <- escalc(yi = eff.size, vi = var.eff.size, data = dat_list[[i]]) %>% list()
+#}
+
+#dat_agg <- NA
+#for (i in 1:length(dat_list)) {
+#  dat_agg[i] <- aggregate.escalc(dat_esc[[i]], cluster = study, rho = 0.5) %>% #list()
+#}
+#-----------------------not run-------------------------------
+
+#saveRDS(dat_agg, file = "dat_agg.Rds")
+dat_agg <- readRDS(here("data","dat_agg.Rds"))
+dat_agg <- plyr::ldply(dat_agg, data.frame) # https://stackoverflow.com/questions/2851327/combine-a-list-of-data-frames-into-one-data-frame-by-row
+# further cleaning
+dat_agg <- dat_agg %>% select(meta.analysis.paper, meta.analysis.year, study, study.year, eff.size.measure, grouped_es, eff.size, var.eff.size)
+# calculate z values
+dat_agg <- dat_agg %>% mutate(z = eff.size/sqrt(var.eff.size))
+dat_agg  <- dat_agg %>% filter(z < 40 & z > -40) # delete potential outliers - we do not have clear a cutoff, but z = 20 is common in eco evo; we can sensitivity analyses to check whether the results are robust to the arbitrary cut-off.
+
+```
+
+
+### Zero-mean 4-component mixture
+
+```{r, warning=FALSE, echo=TRUE}
+# flexmix fits unconstrained normal mixtures. We choose 4 components.
+#fit_agg=flexmix(dat_agg$z ~ 0, k=4)
+#saveRDS(fit_agg, file = "fit_agg.Rds")
+fit_agg <- readRDS(file = "fit_agg.Rds")
+
+p_agg=summary(fit_agg)@comptab$prior  # mixture proportions
+sigma_agg=parameters(fit_agg)         # note: one of the unconstrained sigma's 
+                              # is less than 1
+sigma_agg
+
+
+# fit Zero-mean 4-component mixture
+# log likelihood function
+loglik = function(theta,z){
+  p=c(theta[1:3],1-sum(theta[1:3]))
+  s=theta[4:7]
+  lik=dmix(z,p,m=rep(0,4),s=s)
+  return(-sum(log(lik)))      # *minus* the log lik
+}
+
+# set up constraints for optimization
+# The feasible region is defined by ui %*% par - ci >= 0
+ui=c(-1,-1,-1,rep(0,4))         # 3 mixture props sum to < 1
+ui=rbind(ui,cbind(diag(7)))
+ci=c(-1,0,0,0,1,1,1,1)
+
+# starting value
+theta0=c(p_agg[1:3],pmax(sigma_agg,1.2))
+
+# optimization
+#opt_agg=constrOptim(theta=theta0,f=loglik,ui=ui,ci=ci,
+#                method = "Nelder-Mead",z=dat_agg$z,
+#                control=list(maxit=10^4))
+
+#saveRDS(opt_agg, file = "opt_agg.Rds")
+opt_agg <- readRDS(file = "opt_agg.Rds")
+
+
+# collect the results 
+p_agg=c(opt_agg$par[1:3],1-sum(opt_agg$par[1:3])) # mixture proportions
+sigma_agg=opt_agg$par[4:7]                    # mixture std devs
+m_agg=rep(0,4)                            # mixture means
+df_agg=data.frame(p_agg,mu=m_agg,sigma=sigma_agg)
+round(df_agg,2)
+```
+
+## Estimates {.tabset} 
+
+### Power
+
+Obtain the distribution of the power by transforming the distribution of the SNR.
+
+Summary of power based on simulation:
+
+```{r}
+# whole dataset
+snr=rmix(10^5,p=p_agg,m=m_agg,s=sqrt(sigma_agg^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+summary(power)
+```
+
+The posterior distribution of power:
+
+```{r, warning=FALSE,echo=FALSE}
+# whole dataset
+df=data.frame(power=power)
+power.dist <- ggplot(df, aes(x=power, y=after_stat(density))) +
+  geom_histogram(bins=40,fill="white",col="black") + 
+  scale_x_continuous(breaks = seq(0,1,0.1)) +
+  theme_bw() + labs(x="power",y="",title = "Data aggregation")
+
+power.dist #+  plot_layout(ncol = 3) + plot_annotation(tag_levels = "A")
+
+```
+
+
+### Type M error
+
+Summary of exaggeration based on simulation:
+
+```{r}
+# whole dataset
+snr=rmix(10^5,p=p_agg,m=m_agg,s=sqrt(sigma_agg^2 - 1))
+z=snr + rnorm(10^5)
+z.abs=abs(z)
+exaggeration=abs(z/snr)
+median(exaggeration)                # unconditional median exaggeration
+median(exaggeration[abs(z)>1.96])   # median exaggeration conditionally on |z|>1.96 
+```
+
+The quartiles of exaggeration ratio:
+
+```{r}
+quantile(exaggeration,probs=c(0.25,0.5,0.75))               # unconditional quartiles
+quantile(exaggeration[abs(z)>1.96],probs=c(0.25,0.5,0.75))  # conditional quartiles
+```
+
+
+Summary of conditional median exaggeration based on posterior distribution:
+
+```{r, echo=TRUE}
+z=seq(0,5,0.01)
+quartiles=data.frame(z,Q25=NA,Q50=NA,Q75=NA)
+s=sqrt(sigma_agg^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_agg,m_agg,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  quartiles[i,2:4]=qmixabs(q=c(0.25,0.5,0.75),p=pp,m=pm,s=ps)
+}
+df=quartiles %>% pivot_longer(!z, names_to = "quartile")
+df$exaggeration=df$z/df$value
+summary(df$exaggeration)
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+M.dist <- ggplot(df,aes(x=z,y=exaggeration,color=quartile)) +
+  geom_line() +
+  geom_hline(yintercept=1)+
+  ylab("Exaggeration") + xlab("|z|") + labs(title = "Data aggregation") + 
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 4, by = 0.5),minor_breaks=seq(0, 4, by = 0.25)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0, 5, by = 0.25)) +
+  theme_bw() + theme(legend.position = "top")
+
+M.dist
+```
+
+
+### Coverage
+
+Summary of coverage based on simulation:
+
+```{r}
+snr=rmix(10^5,p=p_agg,m=m_agg,s=sqrt(sigma_agg^2 - 1))
+z=snr + rnorm(10^5)
+cover=abs(z-snr) < 1.96
+mean(cover)               # unconditional coverage
+mean(cover[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+The unconditional probability is exactly 95% because the assumption of normality and known standard error are exactly true in the simulation.
+
+We can compute the conditional coverage given the observed absolute $z$-statistic. Again, the symmetry of the distribution of the $z$-statistic implies that the conditional probability of the coverage event given $|Z|=z$ is equal to the conditional probability given $Z=z$.
+
+
+Summary of coverage based on posterior distribution:
+
+```{r, echo=TRUE}
+z=sort(abs(dat_agg$z))
+coverage=rep(NA,length(z))
+s=sqrt(sigma_agg^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_agg,m_agg,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  coverage[i]=pmix(z[i]+1.96,p=pp,m=pm,s=ps) - 
+    pmix(z[i]-1.96,p=pp,m=pm,s=ps)
+}
+```
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,coverage)
+coverage.dist <- ggplot(data=df, aes(x = z, y = coverage)) +
+  geom_line() +
+  geom_hline(yintercept=0.95,linetype = "dashed")+
+  scale_y_continuous(limits = c(0.8, 1), breaks = seq(0.8, 1, by = 0.05),
+                     minor_breaks=seq(0.8,1,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Coverage") + xlab("|z|") + labs(colour = NULL,title = "Data aggregation") + theme_bw()
+coverage.dist 
+```
+
+The drop in coverage at 1.96 is a result of the atom at zero of the distribution of the SNR.
+
+We can verify the unconditional and conditional coverage by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(coverage)                 # unconditional coverage
+mean(coverage[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+
+### Type S error
+
+The summary of sign error based on simulation:
+
+```{r}
+snr=rmix(10^5,p=p_agg,m=m_agg,s=sqrt(sigma_agg^2 - 1))
+z=snr + rnorm(10^5)
+z.abs=abs(z)
+s.error=(z * snr) < 0
+mean(s.error)               # unconditional probability of a sign error
+mean(s.error[abs(z)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+Summary of the sign error based on posterior distribution
+
+```{r, echo=TRUE}
+z=sort(abs(dat_agg$z))
+error=rep(NA,length(z))
+s=sqrt(sigma_agg^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_agg,m_agg,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  error[i]=pmix(0,p=pp,m=pm,s=ps)
+}
+
+```
+
+We can verify the unconditional and conditional probability of a sign error by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(error)                 # unconditional probability of a sign error / marginal probability of a sign error
+mean(error[abs(z)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,error)
+error.dist <- ggplot(data=df, aes(x = z, y = error)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, by = 0.05),
+                     minor_breaks=seq(0,0.5,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Sign error") + xlab("|z|") + labs(colour = NULL, title = "Data aggregation") + theme_bw()
+error.dist
+```
+
+
+### Replication
+
+Mean replication rate based on simulation:
+
+```{r, echo=TRUE}
+# whole dataset
+snr=rmix(10^5,p=p_agg,m=m_agg,s=sqrt(sigma_agg^2 - 1))
+z.orig=snr + rnorm(10^5) # original
+z.repl = snr + rnorm(10^5) # replication
+replicate=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate)                    # unconditional probability of replication
+mean(replicate[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+
+Mean replication rate based on posterior distribution:
+
+```{r, echo=FALSE, warning=FALSE}
+# z vs. replication
+z=sort(abs(dat_agg$z))
+replicate=rep(NA,length(z))
+s=sqrt(sigma_agg^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_agg,m_agg,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  replicate[i]=1 - pmix(1.96,p=pp,m=pm,s=sqrt(ps^2 +1))
+}
+# will be used for mode estimation
+df_mode_agg=data.frame(z,replicate)
+```
+
+We can verify the unconditional and conditional probability of "successful replication" by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(replicate)               # unconditional probability of replication
+mean(replicate[abs(z)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+### Mode of replication
+
+Estimate the most frequent z value and corresponding replication rate
+
+```{r,warning=FALSE,fig.height=5, fig.width=8}
+z.mcmc <- as.mcmc(df_mode_agg$z[which(df_mode_agg$z > 1.96)])
+df_mode_agg[round(df_mode_agg$z,3) == round(posterior.mode(z.mcmc, adjust = 1),3),][1,]
+
+# visualization
+df=df_mode_agg
+mode_rot = density(z.mcmc)$x[density(z.mcmc)$y==max(density(z.mcmc)$y)]
+mode_ucv = density(z.mcmc, bw = bw.ucv(z.mcmc))$x[density(z.mcmc, bw = bw.ucv(z.mcmc))$y==max(density(z.mcmc, bw = bw.ucv(z.mcmc))$y)]
+mode_sj = density(z.mcmc, bw = bw.SJ(z.mcmc))$x[density(z.mcmc, bw = bw.SJ(z.mcmc))$y==max(density(z.mcmc, bw = bw.SJ(z.mcmc))$y)]
+
+df=filter(df, z > 1.96)
+replicate.dist_agg <- ggplot(data=df, aes(x = z, y = replicate)) + 
+  geom_point(color = "transparent") +
+  geom_line(color = "#1B9E77") + 
+  #geom_smooth(method = stats::loess, formula= y ~ x, se = FALSE) + 
+  geom_vline(xintercept = mode_rot, color = "black", linetype = "dashed") + 
+  geom_vline(xintercept = mode_ucv, color = "red", linetype = "dashed") + 
+  geom_vline(xintercept = mode_sj, color = "blue", linetype = "dashed") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                     minor_breaks=seq(0,1,0.05)) +
+  xlim(c(qnorm(0.05/2,lower.tail = F), 20)) + 
+  #scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),minor_breaks=seq(0,5,0.25)) +
+  ylab("Replicate") + xlab("|z| (Data aggregation)") + labs(colour = NULL, title = "") + theme_bw()
+
+
+#png(filename = "z-curve/z vs replicate (data aggregation).png", width = 5, height = 5, units = "in", type = "windows", res = 400)
+ggMarginal(replicate.dist_agg, type = "density", margins = "x", groupColour = F, groupFill = F, col = "#1B9E77", fill = "#1B9E77", alpha = 0.3)
+#dev.off()
+
+
+# How can I fit a nonlinear line in R?
+# https://stackoverflow.com/questions/44429391/how-can-i-fit-a-nonlinear-line-in-r
+```
+
+
+# Robust analysis {.tabset} 
+
+We use an independent dataset, BMC Bio datasete, to test the robustness of the results.
+
+## Cleaning and modelling {.tabset} 
+
+### Pre-process
+
+```{r, warning=FALSE, echo=TRUE}
+# BMC Bio dataset
+# import datasets with calculated effect sizes       
+dat_robust_csv <- list.files(here("data/robust_dat"), pattern = "*.csv", full.names = TRUE) %>% lapply(read_csv) %>% suppressMessages()  ## need to use full name of each dataset, otherwise read_csv is not able to read it
+dat_robust_list <- NA
+for (i in 1:length(dat_robust_csv)) {
+  dat_robust_list[i] <- dplyr::select(dat_robust_csv[[i]], es, var, study_ID) %>% list()
+} # only keep useful variables
+
+for (i in 1:length(dat_robust_list)) {
+  dat_robust_list[[i]] <- dat_robust_list[[i]] %>% na.omit()
+} # delete NA
+
+# import datasets with raw data  
+dat_robust_csv2 <- list.files(here("data/robust_dat/des_stat"), pattern = "*.csv", full.names = TRUE) %>% lapply(read_csv) %>% suppressMessages()
+
+es_list <- NA
+for (i in 1:length(dat_robust_csv2)) {
+  es_list[i] <- escalc(measure = "SMD", m1i = T_mean, m2i = C_mean,sd1i = T_sd,sd2i = C_sd,n1i = T_n,n2i = C_n, data = dat_robust_csv2[[i]]) %>% list()
+}
+
+# remove NAs, zero variance, and +-Inf
+for (i in 1:length(es_list)) {
+  es_list[[i]] <- es_list[[i]][!is.na(es_list[[i]]$yi) & !is.na(es_list[[i]]$vi) & es_list[[i]]$vi != 0, ]
+} # delete Inf, zero variance
+
+
+for (i in 1:length(es_list)) {
+  es_list[[i]] <- es_list[[i]] %>% na.omit()
+} # delete NA
+
+## rename effect size and sampling variance to keep consistant
+for (i in 1:length(es_list)) {
+  names(es_list[[i]])[names(es_list[[i]]) == "yi"] <- "es"
+  names(es_list[[i]])[names(es_list[[i]]) == "vi"] <- "var"
+}
+
+
+dat_robust_list2 <- NA
+for (i in 1:length(es_list)) {
+  dat_robust_list2[i] <- dplyr::select(es_list[[i]], es, var, study_ID) %>% list()
+} # only keep useful variables
+
+dat_robust <- plyr::ldply(append(dat_robust_list, dat_robust_list2), data.frame) # unlist
+dat_robust <- dat_robust %>% mutate(se = sqrt(var)) %>% mutate(z = es / se)
+
+
+# Remove -Inf and Inf from column_name
+dat_robust <- dat_robust[is.finite(dat_robust$z), ]
+dat_robust <- dat_robust %>% filter(z < 40 & z > -40) # delete potential outliers - we do not have clear a cutoff, but z = 20 is common in eco evo; we can sensitivity analyses to check whether the results are robust to the arbitrary cut-off.
+```
+
+### Zero-mean 4-component mixture
+
+```{r, warning=FALSE, echo=TRUE}
+# flexmix fits unconstrained normal mixtures. We choose 4 components.
+#fit_robust=flexmix(dat_robust$z ~ 0, k=4)
+#saveRDS(fit_robust, file = "fit_robust.Rds")
+fit_robust <- readRDS(file = "fit_robust.Rds")
+
+p_robust=summary(fit_robust)@comptab$prior  # mixture proportions
+sigma_robust=parameters(fit_robust)         # note: one of the unconstrained sigma's 
+                              # is less than 1
+sigma_robust
+
+
+# fit Zero-mean 4-component mixture
+# log likelihood function
+loglik = function(theta,z){
+  p=c(theta[1:3],1-sum(theta[1:3]))
+  s=theta[4:7]
+  lik=dmix(z,p,m=rep(0,4),s=s)
+  return(-sum(log(lik)))      # *minus* the log lik
+}
+
+# set up constraints for optimization
+# The feasible region is defined by ui %*% par - ci >= 0
+ui=c(-1,-1,-1,rep(0,4))         # 3 mixture props sum to < 1
+ui=rbind(ui,cbind(diag(7)))
+ci=c(-1,0,0,0,1,1,1,1)
+
+# starting value
+theta0=c(p_agg[1:3],pmax(sigma_agg,1.2))
+
+# optimization
+#opt_robust=constrOptim(theta=theta0,f=loglik,ui=ui,ci=ci,
+#                method = "Nelder-Mead",z=dat_robust$z,
+#                control=list(maxit=10^4))
+
+#saveRDS(opt_robust, file = "opt_robust.Rds")
+opt_robust <- readRDS(file = "opt_robust.Rds")
+
+
+# collect the results 
+p_robust=c(opt_robust$par[1:3],1-sum(opt_robust$par[1:3])) # mixture proportions
+sigma_robust=opt_robust$par[4:7]                    # mixture std devs
+m_robust=rep(0,4)                            # mixture means
+df_robust=data.frame(p_robust,mu=m_robust,sigma=sigma_robust)
+round(df_robust,2)
+
+```
+## Estimates {.tabset} 
+
+### Power
+
+Obtain the distribution of the power by transforming the distribution of the SNR.
+
+
+Summary of power based on simulation:
+
+```{r}
+# whole dataset
+snr=rmix(10^5,p=p_robust,m=m_robust,s=sqrt(sigma_robust^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+summary(power)
+```
+
+The posterior distribution of power:
+
+```{r, warning=FALSE,echo=FALSE}
+# whole dataset
+df=data.frame(power=power)
+power.dist <- ggplot(df, aes(x=power, y=after_stat(density))) +
+  geom_histogram(bins=40,fill="white",col="black") + 
+  scale_x_continuous(breaks = seq(0,1,0.1)) +
+  theme_bw() + labs(x="power",y="",title = "Robust data")
+
+power.dist #+  plot_layout(ncol = 3) + plot_annotation(tag_levels = "A")
+
+```
+
+
+### Type M error
+
+Summary of exaggeration based on simulation:
+
+```{r}
+# whole dataset
+snr=rmix(10^5,p=p_robust,m=m_robust,s=sqrt(sigma_robust^2 - 1))
+z=snr + rnorm(10^5)
+z.abs=abs(z)
+exaggeration=abs(z/snr)
+median(exaggeration)                # unconditional median exaggeration
+median(exaggeration[abs(z)>1.96])   # median exaggeration conditionally on |z|>1.96 
+```
+
+The quartiles of exaggeration ratio:
+
+```{r}
+quantile(exaggeration,probs=c(0.25,0.5,0.75))               # unconditional quartiles
+quantile(exaggeration[abs(z)>1.96],probs=c(0.25,0.5,0.75))  # conditional quartiles
+```
+
+
+Summary of conditional median exaggeration based on posterior distribution:
+
+```{r, echo=TRUE}
+z=seq(0,5,0.01)
+quartiles=data.frame(z,Q25=NA,Q50=NA,Q75=NA)
+s=sqrt(sigma_robust^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_robust,m_robust,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  quartiles[i,2:4]=qmixabs(q=c(0.25,0.5,0.75),p=pp,m=pm,s=ps)
+}
+df=quartiles %>% pivot_longer(!z, names_to = "quartile")
+df$exaggeration=df$z/df$value
+summary(df$exaggeration)
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+M.dist <- ggplot(df,aes(x=z,y=exaggeration,color=quartile)) +
+  geom_line() +
+  geom_hline(yintercept=1)+
+  ylab("Exaggeration") + xlab("|z|") + labs(title = "Robust data") + 
+  scale_y_continuous(limits = c(0, 3), breaks = seq(0, 4, by = 0.5),minor_breaks=seq(0, 4, by = 0.25)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0, 5, by = 0.25)) +
+  theme_bw() + theme(legend.position = "top")
+
+M.dist
+```
+
+
+### Coverage
+
+Summary of coverage based on simulation:
+
+```{r}
+snr=rmix(10^5,p=p_robust,m=m_robust,s=sqrt(sigma_robust^2 - 1))
+z=snr + rnorm(10^5)
+cover=abs(z-snr) < 1.96
+mean(cover)               # unconditional coverage
+mean(cover[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+The unconditional probability is exactly 95% because the assumption of normality and known standard error are exactly true in the simulation.
+
+We can compute the conditional coverage given the observed absolute $z$-statistic. Again, the symmetry of the distribution of the $z$-statistic implies that the conditional probability of the coverage event given $|Z|=z$ is equal to the conditional probability given $Z=z$.
+
+
+Summary of coverage based on posterior distribution:
+
+```{r, echo=TRUE}
+z=sort(abs(dat_robust$z))
+coverage=rep(NA,length(z))
+s=sqrt(sigma_robust^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_robust,m_robust,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  coverage[i]=pmix(z[i]+1.96,p=pp,m=pm,s=ps) - 
+    pmix(z[i]-1.96,p=pp,m=pm,s=ps)
+}
+```
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,coverage)
+coverage.dist <- ggplot(data=df, aes(x = z, y = coverage)) +
+  geom_line() +
+  geom_hline(yintercept=0.95,linetype = "dashed")+
+  scale_y_continuous(limits = c(0.8, 1), breaks = seq(0.8, 1, by = 0.05),
+                     minor_breaks=seq(0.8,1,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Coverage") + xlab("|z|") + labs(colour = NULL,title = "Robust data") + theme_bw()
+coverage.dist 
+```
+
+The drop in coverage at 1.96 is a result of the atom at zero of the distribution of the SNR.
+
+We can verify the unconditional and conditional coverage by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(coverage)                 # unconditional coverage
+mean(coverage[abs(z)>1.96])  # coverage conditional on |z|>1.96
+```
+
+
+### Type S error
+
+The summary of sign error based on simulation:
+
+```{r}
+snr=rmix(10^5,p=p_robust,m=m_robust,s=sqrt(sigma_robust^2 - 1))
+z=snr + rnorm(10^5)
+z.abs=abs(z)
+s.error=(z * snr) < 0
+mean(s.error)               # unconditional probability of a sign error
+mean(s.error[abs(z)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+Summary of the sign error based on posterior distribution
+
+```{r, echo=TRUE}
+z=sort(abs(dat_robust$z))
+error=rep(NA,length(z))
+s=sqrt(sigma_robust^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_robust,m_robust,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  error[i]=pmix(0,p=pp,m=pm,s=ps)
+}
+
+```
+
+We can verify the unconditional and conditional probability of a sign error by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(error)                 # unconditional probability of a sign error / marginal probability of a sign error
+mean(error[abs(z)>1.96])  # conditional probability of a sign error given |z|>1.96
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+df=data.frame(z,error)
+error.dist <- ggplot(data=df, aes(x = z, y = error)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 0.5), breaks = seq(0, 0.5, by = 0.05),
+                     minor_breaks=seq(0,0.5,0.01)) +
+  scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),
+                     minor_breaks=seq(0,5,0.25)) +
+  ylab("Sign error") + xlab("|z|") + labs(colour = NULL, title = "Robust data") + theme_bw()
+error.dist
+```
+
+
+### Replication
+
+Mean replication rate based on simulation:
+
+```{r, echo=TRUE}
+# whole dataset
+snr=rmix(10^5,p=p_robust,m=m_robust,s=sqrt(sigma_robust^2 - 1))
+z.orig=snr + rnorm(10^5) # original
+z.repl = snr + rnorm(10^5) # replication
+replicate=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate)                    # unconditional probability of replication
+mean(replicate[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+
+Mean replication rate based on posterior distribution:
+
+```{r, echo=FALSE, warning=FALSE}
+# z vs. replication
+z=sort(abs(dat_robust$z))
+replicate=rep(NA,length(z))
+s=sqrt(sigma_robust^2-1)
+for (i in 1:length(z)){
+  post=posterior(z[i],p_robust,m_robust,s)
+  pp=post$p
+  pm=post$pm
+  ps=post$ps
+  replicate[i]=1 - pmix(1.96,p=pp,m=pm,s=sqrt(ps^2 +1))
+}
+df_mode_robust = data.frame(z,replicate)
+```
+
+We can verify the unconditional and conditional probability of "successful replication" by averaging over the empirical distribution of the $z$-values.
+
+```{r, echo=TRUE}
+mean(replicate)               # unconditional probability of replication
+mean(replicate[abs(z)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+### Mode of replication
+
+Estimate the most frequent z value and corresponding replication rate
+
+```{r,warning=FALSE,fig.height=5, fig.width=8}
+z.mcmc <- as.mcmc(df_mode_robust$z[which(df_mode_robust$z > 1.96)])
+df_mode_robust[round(df_mode_robust$z,3) == round(posterior.mode(z.mcmc, adjust = 1),3),][1,]
+
+# visualization
+df=df_mode_robust
+mode_rot = density(z.mcmc)$x[density(z.mcmc)$y==max(density(z.mcmc)$y)]
+mode_ucv = density(z.mcmc, bw = bw.ucv(z.mcmc))$x[density(z.mcmc, bw = bw.ucv(z.mcmc))$y==max(density(z.mcmc, bw = bw.ucv(z.mcmc))$y)]
+mode_sj = density(z.mcmc, bw = bw.SJ(z.mcmc))$x[density(z.mcmc, bw = bw.SJ(z.mcmc))$y==max(density(z.mcmc, bw = bw.SJ(z.mcmc))$y)]
+
+df=filter(df, z > 1.96)
+replicate.dist_robust <- ggplot(data=df, aes(x = z, y = replicate)) + 
+  geom_point(color = "transparent") +
+  geom_line(color = "#1B9E77") + 
+  #geom_smooth(method = stats::loess, formula= y ~ x, se = FALSE) + 
+  geom_vline(xintercept = mode_rot, color = "black", linetype = "dashed") + 
+  geom_vline(xintercept = mode_ucv, color = "red", linetype = "dashed") + 
+  geom_vline(xintercept = mode_sj, color = "blue", linetype = "dashed") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                     minor_breaks=seq(0,1,0.05)) +
+  xlim(c(qnorm(0.05/2,lower.tail = F), 20)) + 
+  #scale_x_continuous(limits = c(0, 5), breaks = seq(0, 5, by = 1),minor_breaks=seq(0,5,0.25)) +
+  ylab("Replicate") + xlab("|z| (Robust data)") + labs(colour = NULL, title = "") + theme_bw()
+
+
+#png(filename = "z-curve/z vs replicate (data aggregation).png", width = 5, height = 5, units = "in", type = "windows", res = 400)
+ggMarginal(replicate.dist_robust, type = "density", margins = "x", groupColour = F, groupFill = F, col = "#1B9E77", fill = "#1B9E77", alpha = 0.3)
+#dev.off()
+
+
+# How can I fit a nonlinear line in R?
+# https://stackoverflow.com/questions/44429391/how-can-i-fit-a-nonlinear-line-in-r
+```
+
+
+
+
+\newpage
+# References
+
+
+<div id="refs"></div>
+
