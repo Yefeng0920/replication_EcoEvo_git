@@ -296,10 +296,10 @@ ci_multiplier_dataframe = DataFrame(
 CSV.write("confidence_intervals_sample_size_multiplier.csv", ci_multiplier_dataframe)
 
 # ╔═╡ 22dfe6e3-f07b-4411-a8b8-f8f1d73cf4f5
-md"""### Supplement regarding marginal density confidence intervals"""
+md"""### Marginal density confidence intervals"""
 
 # ╔═╡ d2dfbeb9-8984-46fb-b296-414e5baa991d
-zs_density = 0:0.1:6.0
+zs_density = 0.0:0.1:10
 
 # ╔═╡ b05e590a-7e2e-4e2a-8bba-b5ceaa967c86
 density_targets = MarginalDensity.(FoldedNormalSample.(zs_density, 1.0))
@@ -324,6 +324,17 @@ plot(zs_density, density_targets_Ĝ, color=:black,
 )
 plot!(zs_density, density_targets_cis, label="")
 end
+
+# ╔═╡ 7a12e837-ec81-487b-9c28-13a22c31fde7
+marginal_density_ci_dataframe = DataFrame(
+	z = zs_density,
+	point_estimate = density_targets_Ĝ,
+	lower_ci = getproperty.(density_targets_cis, :lower),
+	upper_ci = getproperty.(density_targets_cis, :upper)
+)
+
+# ╔═╡ 58c9c831-654d-48ee-9714-5aef901eaeaf
+CSV.write("confidence_intervals_marginal_density.csv", marginal_density_ci_dataframe)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -352,7 +363,7 @@ StatsBase = "~0.33.21"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.0"
+julia_version = "1.10.1"
 manifest_format = "2.0"
 project_hash = "80253dc9d9aa9f93e0feaed3fa3ca4c3c5f52a9e"
 
@@ -508,7 +519,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.0.5+1"
+version = "1.1.0+0"
 
 [[deps.ConcurrentUtilities]]
 deps = ["Serialization", "Sockets"]
@@ -1188,7 +1199,7 @@ version = "0.3.24+0"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.23+2"
+version = "0.3.23+4"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -2076,11 +2087,13 @@ version = "1.4.1+1"
 # ╠═11625fdc-8ee2-499f-94f8-de98eef40880
 # ╠═1073a98a-6e8e-47d2-a352-6d8a59eb1a80
 # ╠═27c9e1c7-e53a-46bc-9655-a4637e6bbd69
-# ╠═22dfe6e3-f07b-4411-a8b8-f8f1d73cf4f5
+# ╟─22dfe6e3-f07b-4411-a8b8-f8f1d73cf4f5
 # ╠═d2dfbeb9-8984-46fb-b296-414e5baa991d
 # ╠═b05e590a-7e2e-4e2a-8bba-b5ceaa967c86
 # ╠═469bb01d-fec7-4006-9b78-dc086c7aba5b
 # ╠═43e5e104-79a6-4fc5-af28-d170c94ee4f9
 # ╠═56f65b88-f32c-44bd-a43b-583e3112f0e9
+# ╠═7a12e837-ec81-487b-9c28-13a22c31fde7
+# ╠═58c9c831-654d-48ee-9714-5aef901eaeaf
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
