@@ -3,7 +3,7 @@
 
 ## Transparency declaration
 
-The lead author (the manuscript’s guarantor) affirms that the manuscript is an honest, accurate, and transparent account of the study being reported; that no important
+The authors affirms that the manuscript is an honest, accurate, and transparent account of the study being reported; that no important
 aspects of the study have been omitted.
 
 ## Data, code, and materials transparency
@@ -19,7 +19,7 @@ xxx
 
 ## Structure
 
-The repository contains the following folders:
+The repository contains 5 folders:
 
 - `data`
 
@@ -34,7 +34,13 @@ The repository contains the following folders:
   
 ### `data` folder
 
-The `data` folder includes the raw data files that were retrieved from meta-analysis papers published in different disciplines.
+The `data` folder includes three sub-folders:
+
+`data/main` containing raw data for reproducing the main analyses.
+
+`data/sensitivity` containing raw data for reproducing the sensitivity analyses.
+
+`data/model` containing model estimates from the `R` and `Julia` code for reproducing the figures.
 
 ### `Function` folder
 
