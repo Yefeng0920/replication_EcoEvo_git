@@ -64,7 +64,7 @@ The `Julia` folder includes give `.jl` files:
 
 `Julia/julia_independent_datar.jl` contains the `Julia` scripts used to reproduce all supplementary results related to the independent dataset dataset (see `data/sensitivity`). 
 
-The confidence interval is based on the Dvoretzky-Kiefer-Wolfowitz *F*-Localization approach, implemented in the `Julia` package [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl). [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl).
+The confidence interval is based on the Dvoretzky-Kiefer-Wolfowitz *F*-Localization approach, implemented in the `Julia` package [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl).
 
 ### `R` folder
 
@@ -87,27 +87,52 @@ The `func` folder includes the custom `R` functions used for model fitting and v
 
 ### `figure`
 
-The `figure` folder includes the main figure (from `R/figure.Rmd`) and supplementary figure (from `R/SI figure.Rmd) reported in the manuscript.
+The `figure` folder includes the main figure (from `R/figure.Rmd`) and supplementary figure (from `R/SI figure.Rmd`) reported in the manuscript.
 
 
 ## Licence
 
 The files in this dataset are licensed under the Creative Commons Attribution 4.0 International License (to view a copy of this license, visit http://creativecommons.org/licenses/by/4.0/).
 
-## Contact
+## General correspondence
 
 - Dr. Yefeng Yang
 
-Evolution & Ecology Research Centre, EERC
-School of Biological, Earth and Environmental Sciences, BEES
+Evolution & Ecology Research Centre (EERC), 
+School of Biological, Earth and Environmental Sciences (BEES), 
 The University of New South Wales, Sydney, Australia
 
 Email: yefeng.yang1@unsw.edu.au
 
-- Professor Shinichi Nakagawa, PhD, FRSN
+- Professor Shinichi Nakagawa, PhD
 
-Evolution & Ecology Research Centre, EERC
-School of Biological, Earth and Environmental Sciences, BEES. 
-The University of New South Wales, Sydney, Australia  
+Evolution & Ecology Research Centre (EERC), 
+School of Biological, Earth and Environmental Sciences (BEES), 
+The University of New South Wales, Sydney, Australia 
 
 Email: s.nakagawa@unsw.edu.au.  
+
+## Correspondence regarding the code
+
+- Dr. Yefeng Yang
+
+Evolution & Ecology Research Centre (EERC), 
+School of Biological, Earth and Environmental Sciences (BEES), 
+The University of New South Wales, Sydney, Australia
+
+Email: yefeng.yang1@unsw.edu.au
+
+- Dr. Erik van Zwet
+
+Department of Biomedical Data Sciences,
+Leiden University Medical Center, Leiden, The Netherlands
+
+Email: e.w.van_zwet@lumc.nl
+
+
+- Dr. Nikolaos Ignatiadis
+
+Department of Statistics and Data Science Institute, 
+University of Chicago, Chicago, IL, USA
+
+Email: nikos.ignatiadis01@gmail.com
