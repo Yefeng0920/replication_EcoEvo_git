@@ -6,11 +6,12 @@
 The authors affirms that the manuscript is an honest, accurate, and transparent account of the study being reported, and no important
 aspects of the study have been omitted.
 
-## Data, code, and materials transparency
+## Reproducibility declaration
 
 This reporsitory contains all data and code (both in `R` and `Julia`)  used to reproduce the results reported in the following manuscript:
 
 > Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa. A large-scale in silico replication project of ecological and evolutionary studies. 2024.
+
 
 ## General instructions for reproducibility
 
