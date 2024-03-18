@@ -46,21 +46,37 @@ The `data` folder includes three sub-folders:
 
 The `R` folder includes three `.rmd` files:
 
-`R/main.Rmd` contains the R scripts used to reproduce all results (in terms of point estimates) shown in the main text. 
+`R/main.Rmd` contains the `R` scripts used to reproduce all results (in terms of point estimates) shown in the main text. 
 
-`R/sensitivity.Rmd` contains the R scripts used to reproduce all results (in terms of point estimates) shown in the supplementary materials. 
+`R/sensitivity.Rmd` contains the `R` scripts used to reproduce all supplementary results (in terms of point estimates). 
 
-`R/figure.Rmd` contains the R scripts used to reproduce all figures shown in the main text. 
+`R/figure.Rmd` contains the `R` scripts used to reproduce all figures shown in the main text. 
 
-`R/SI figure.Rmd` contains the R scripts used to reproduce all supplementary figures corresponding to the sensitivity analyses.
+`R/SI figure.Rmd` contains the `R` scripts used to reproduce all supplementary figures corresponding to the sensitivity analyses.
 
-Note that the data (or, more precisely, confidence intervals) used by `R/figure.Rmd` and `R/SI figure.Rmd` are producded [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl), a `Julia` package implementing Dvoretzky-Kiefer-Wolfowitz F-Localization approach to compute confidence intervals for nonparametric Empirical Bayes. 
+Note that the data (or, more precisely, confidence intervals) used by `R/figure.Rmd` and `R/SI figure.Rmd` are producded [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl), a `Julia` package implementing Dvoretzky-Kiefer-Wolfowitz *F*-Localization approach to compute confidence intervals for nonparametric Empirical Bayes (see the folder `Julia`). 
 
 
-### `Function` folder
+### `Julia` folder
 
-The `Function` folder includes all the custom R functions used to generate the sample figures shown in the main text.
+The `Julia` folder includes give `.jl` files:
 
+`Julia/julia_main_data.jl` contains the `Julia` scripts used to reproduce all results (in terms of both point estimates and confidence intervals) shown in the main text. 
+
+`Julia/julia_SMD.jl` contains the `Julia` scripts used to reproduce all supplementary results related to the main dataset using standardized mean difference (SMD) as the effect size measure. 
+
+`Julia/julia_lnRR.jl` contains the `Julia` scripts used to reproduce all supplementary results related to the main dataset using log response ratio (lnRR) as the effect size measure. 
+
+`Julia/julia_Zr.jl` contains the `Julia` scripts used to reproduce all supplementary results related to the main dataset using Fisher's r-to-Zr (*Zr*) as the effect size measure. 
+
+`Julia/julia_independent_datar.jl` contains the `Julia` scripts used to reproduce all supplementary results related to the independent dataset dataset (see `data/sensitivity`). 
+
+The confidence intervals are computed via the `Julia` package [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl).
+
+
+### `func` folder
+
+The `func` folder includes the custom `R` functions used for model fitting and visualizations.
 
 
 ## Licence
