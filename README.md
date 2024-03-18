@@ -8,14 +8,20 @@ aspects of the study have been omitted.
 
 ## Reproducibility declaration
 
-This reporsitory contains all data and code (both in `R` and `Julia`)  that can be used to reproduce all results reported in the following manuscript:
+This reporsitory contains all data and code that can be used to reproduce all results reported in the following manuscript:
 
 > Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa. A large-scale in silico replication project of ecological and evolutionary studies. 2024.
 
 
 ## General instructions for reproducibility
 
-xxx
+We provide both the `R` code and `Julia` code. 
+
+Firstly, we use the `R` code (see `R` folder) to fit the mixture model described in the manuscript and get the point estimate regarding the replicability reported in the manuscript.
+
+Secondly, we use the estimates derived from the fitted mixture model (via `R`) as the input as the `Julia` code (see `Julia` folder) to reproduce the point estimates obtained in `R` and compute the 95% confidence interval. 
+
+Thirdly, we export both the point estimate and 95% confidence interval from `Julia` and use `R` to make figures.
 
 
 ## Structure
@@ -24,9 +30,9 @@ The repository contains 5 folders:
 
 - `data`
 
-- `R`
-
 - `Julia`
+
+- `R`
 
 - `func`
  
@@ -43,20 +49,6 @@ The `data` folder includes three sub-folders:
 
 `data/model` contains model estimates from the `R` and `Julia` code for reproducing the figures reported in the main text and supplementary materials.
 
-### `R` folder
-
-The `R` folder includes three `.rmd` files:
-
-`R/main.Rmd` contains the `R` scripts used to reproduce all results (in terms of point estimates) shown in the main text. 
-
-`R/sensitivity.Rmd` contains the `R` scripts used to reproduce all supplementary results (in terms of point estimates). 
-
-`R/figure.Rmd` contains the `R` scripts used to reproduce all figures shown in the main text. 
-
-`R/SI figure.Rmd` contains the `R` scripts used to reproduce all supplementary figures corresponding to the sensitivity analyses.
-
-Note that the data (or, more precisely, confidence intervals) used by `R/figure.Rmd` and `R/SI figure.Rmd` are producded [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl), a `Julia` package implementing Dvoretzky-Kiefer-Wolfowitz *F*-Localization approach to compute confidence intervals for nonparametric Empirical Bayes (see the folder `Julia`). 
-
 
 ### `Julia` folder
 
@@ -72,12 +64,30 @@ The `Julia` folder includes give `.jl` files:
 
 `Julia/julia_independent_datar.jl` contains the `Julia` scripts used to reproduce all supplementary results related to the independent dataset dataset (see `data/sensitivity`). 
 
-The confidence intervals are computed via the `Julia` package [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl).
+The confidence interval is based on the Dvoretzky-Kiefer-Wolfowitz *F*-Localization approach, implemented in the `Julia` package [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl). [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl).
+
+### `R` folder
+
+The `R` folder includes three `.rmd` files:
+
+`R/main.Rmd` contains the `R` scripts used to reproduce all results (in terms of the point estimate) shown in the main text. 
+
+`R/sensitivity.Rmd` contains the `R` scripts used to reproduce all supplementary results (in terms of the point estimate). 
+
+`R/figure.Rmd` contains the `R` scripts used to reproduce all figures shown in the main text. 
+
+`R/SI figure.Rmd` contains the `R` scripts used to reproduce all supplementary figures corresponding to the sensitivity analyses.
+
+Note that the data (or, more precisely, confidence intervals) used by `R/figure.Rmd` and `R/SI figure.Rmd` are producded via the `Julia` package [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl) (see the folder `Julia`). 
 
 
 ### `func` folder
 
 The `func` folder includes the custom `R` functions used for model fitting and visualizations.
+
+### `figure`
+
+The `figure` folder includes the main figure (from `R/figure.Rmd`) and supplementary figure (from `R/SI figure.Rmd) reported in the manuscript.
 
 
 ## Licence
