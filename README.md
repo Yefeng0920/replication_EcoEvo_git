@@ -8,7 +8,7 @@ aspects of the study have been omitted.
 
 ## Reproducibility declaration
 
-This reporsitory contains all data and code (both in `R` and `Julia`)  used to reproduce the results reported in the following manuscript:
+This reporsitory contains all data and code (both in `R` and `Julia`)  that can be used to reproduce all results reported in the following manuscript:
 
 > Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa. A large-scale in silico replication project of ecological and evolutionary studies. 2024.
 
