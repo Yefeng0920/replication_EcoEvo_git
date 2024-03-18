@@ -1,4 +1,4 @@
-# A large-scale in silico replication project of ecological and evolutionary studies
+# A large-scale *in silico* replication project of ecological and evolutionary studies
 
 
 ## Transparency declaration
