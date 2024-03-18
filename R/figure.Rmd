@@ -1,0 +1,207 @@
+---
+title: "Figures for a large-scale in silico replication project of ecological and evolutionary studies"
+author: "Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa"
+header-includes: \usepackage{amsmath}
+output:
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    keep_tex: no
+---
+
+# Set-up
+
+```{r, warning=FALSE, echo=TRUE}
+knitr::opts_chunk$set(fig.height = 5, fig.width = 12)
+set.seed(2023)
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(readr)
+  library(tidyr) 
+  library(ggplot2)
+  library(here)
+  library(RColorBrewer)
+  library(cowplot)
+  library(patchwork)
+  library(aplot)
+  library(ggplotify) 
+  library(plot3D)
+  library(stringr)
+  library(palettetown)
+  library(lisa)
+  library(wesanderson)
+  library(ggpubr)
+  })
+# function
+source(here("func","func.R"))
+# define colours
+dotCOLS = c("#74A089","#a6d8f0")
+barCOLS = c("#0B775E","#008fd5")
+# theme
+col.p <- pokepal(pokemon = 17)
+theme_custom <- ggplot2::theme_grey() +
+    ggplot2::theme(text = element_text(color = col.p[4]),
+                   axis.text = element_text(color = col.p[4]),
+                   axis.ticks = element_line(color = col.p[4]),
+                   legend.background = element_blank(),
+                   legend.box.background = element_blank(),
+                   legend.key = element_rect(fill = lisa_palette("KatsushikaHokusai")[5]),
+          panel.background = element_rect(fill = alpha(lisa_palette("KatsushikaHokusai")[5],0.7), color = lisa_palette("KatsushikaHokusai")[5]),
+          panel.grid = element_blank(),
+          plot.background = element_rect(fill = "transparent", color = "transparent"),
+          strip.background = element_rect(fill = alpha(col.p[2], 1/3), color = "transparent"),
+          strip.text = element_text(color = col.p[4]))
+```
+
+
+# Figure 1
+
+Replication rate curve with confidence intervals, which were computed using the Julia code.
+
+```{r}
+# replicate rate with CIs, which were computed using the julia code
+df <- read.csv(here("data/model","CI_censored_dat.csv"))
+df2 <- read.csv(here("data/model","CI_marginal_density.csv"))
+names(df)[2] <- "replicate"
+names(df2)[2] <- "density"
+
+replicate.dist <- ggplot(data = df, aes(x = z, y = replicate)) +
+  geom_line(linetype="solid", color="grey", linewidth = 0.8) +
+  geom_line(data=filter(df,z>=2),linetype="solid", color = "#E7298A", linewidth = 0.8) + 
+  geom_ribbon(aes(z, ymin=lower_ci, ymax=upper_ci), 
+              fill="#E6AB02", alpha=0.5) +
+  geom_vline(xintercept = 2, linetype = "dashed", color = "grey") + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(breaks = seq(0, 10, by = 2), minor_breaks=seq(0,10,1),
+                     expand = expansion(mult = c(0, 0.025))) +
+  ylab("Replicability") + xlab(expression(paste(italic(z)~"statistic"))) +
+  labs(colour = NULL) + 
+  theme_custom + 
+  theme(plot.margin = grid::unit(c(0, 0, 0.2, 0), "lines"),
+        axis.title = element_text(size = 15, color = "black"),
+        axis.text = element_text(size = 13, color = "black"),
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"))
+      
+
+top.dist2 <- ggplot(data=df2, aes(x = z, y=density)) +
+  geom_line(linetype="solid", color="grey", linewidth = 0.8) +
+  geom_ribbon(data=filter(df2,z<=2),aes(z, ymax=upper_ci, ymin=lower_ci), fill="grey", alpha = 0.6) + 
+  geom_line(data=filter(df2,z>=2),linetype="solid", color="#E7298A", linewidth = 0.8) +
+  geom_ribbon(data=filter(df2,z>=2),aes(z, ymax=upper_ci, ymin=lower_ci), fill="#E7298A", alpha = 0.2) +
+  geom_segment(aes(x = 2 , y = 0, xend = 2, yend = 0.185), linetype = "dashed", color = "grey") + 
+  
+  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2), expand = expansion(mult = c(0, 0.025))) + 
+  scale_y_continuous(expand = expansion(mult = c(0, 0.01))) + 
+  labs(x = "", y = "") + 
+  theme_void() +
+  theme(plot.margin = grid::unit(c(0, 0, 0, 0), "lines"))
+
+
+png(filename = here("figure","fig 1.png"), width = 6, height = 5, units = "in", type = "windows", res = 400)
+plot_grid(top.dist2,
+          replicate.dist,
+          align = "v",
+          ncol = 1,
+          axis = "bl", 
+          rel_heights = c(0.8,1))
+dev.off()
+```
+
+
+# Figure 2
+
+Replicate rate with CIs, which were computed using the julia code
+
+```{r}
+# A
+# replicate rate with CIs, which were computed using the julia code
+df <- read.csv(here("data/model","CI_evidence_strength.csv"))
+names(df)[2] <- "replicate"
+strength = c("No evidence", "Weak evidence","Moderate evidence",
+             "Strong evidence","Very strong evidence")
+strength = factor(strength,
+                  levels=c("No evidence", "Weak evidence",
+                           "Moderate evidence","Strong evidence",
+                           "Very strong evidence"))
+df$strength <- strength
+df$evidence <- rep("evidence", 5)
+
+df <- df %>% mutate(evidence2 = c("29% (p = 0.1)", "38% (p = 0.05)", "55% (p = 0.01)", "74% (p = 0.001)", "85% (p = 0.0001)"))
+
+df <- df %>% mutate(evidence3 = c("(p = 0.1)", "(p = 0.05)", "(p = 0.01)", "(p = 0.001)", "(p = 0.0001)"))
+
+
+evidence.rep.p <- ggplot(df, aes(x= strength, y = replicate, ymin=lower_ci, ymax=upper_ci, color = evidence, fill = evidence)) + 
+  geom_errorbar(linewidth=1) + 
+  #geom_linerange(linewidth=12) + 
+  #coord_flip() +
+  geom_point(size=4, shape=21, colour="white", stroke = 1) +
+  scale_fill_manual(values=barCOLS[2]) +
+  scale_color_manual(values=dotCOLS[2]) +
+  #scale_size(range=c(8,15)) +
+  geom_text(aes(label = scales::percent(replicate)), size = 4, color = "#A6761D", vjust = -2.5) + 
+  #geom_text(aes(label = evidence2), size = 3.5, color = "#A6761D", vjust = -3) +
+  geom_text(aes(label = evidence3), size = 3.5, color = "#A6761D", vjust = 3) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), labels = scales::percent_format(accuracy=1)) + # expand = expansion(mult = c(0, 0)),
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10), expand = expansion(mult = c(0.03, 0.03))) + 
+  theme_minimal() + theme_custom +
+  guides(fill = "none", color = "none") +
+  labs(x = "", y = bquote(paste("Replicability"))) +
+  theme(axis.title = element_text(size = 16, color = "black"),
+        axis.text = element_text(size = 15, color = "black"),
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0,0.3,-0.5,0), 'cm'))
+
+
+# B
+# replicate rate with CIs, which were computed using the Julia code
+df <- read.csv(here("data/model","CI_multiplier_dat.csv"))
+
+replicate_multiplier.p <- df %>% ggplot() +
+  geom_line(aes(x = multiplier, y = point_estimate_2_0)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_2_0, ymax=upper_2_0), fill="#1B9E77", alpha=0.5) +
+  #geom_line(aes(x = multiplier, y = point_estimate_2_6)) + 
+  #geom_ribbon(aes(x = multiplier, ymin=lower_ci_2_6, ymax=upper_2_6), fill="#E7298A", alpha=0.5) +
+  geom_line(aes(x = multiplier, y = point_estimate_3_3)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_3_3, ymax=upper_3_3), fill="#D95F02", alpha=0.5) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(limits = c(1, 10), breaks = seq(1, 10, by = 1),
+                     labels=paste(1:10,"x",sep=''),
+                     expand = expansion(mult = c(0.03, 0.03))) + 
+  ylab("Replicability") + 
+  xlab(expression(paste("Relative sample size for the replication study"))) +
+  theme_custom + 
+  theme(axis.title = element_text(size = 16, color = "black"),
+        axis.text = element_text(size = 15, color = "black"),
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0,0.3,0,0), 'cm')) +
+  annotate("text", x = 3, y = 0.50, label = "Weak evidence", size = 5, color = "#A6761D") +
+  #annotate("text", x = 3, y = 0.75, label = "Moderate evidence", size = 4, color = "#A6761D") +
+  annotate("text", x = 3, y = 0.84, label = "Strong evidence", size = 5, color =  "#A6761D")
+
+
+png(filename = here("figure","fig 2.png"), width = 7, height = 11, units = "in", type = "windows", res = 400)
+plot_grid(evidence.rep.p,
+          replicate_multiplier.p,
+          align = "v",
+          ncol = 1,
+          axis = "bl", 
+          rel_heights = c(1,1))
+dev.off()
+```
+
+
+

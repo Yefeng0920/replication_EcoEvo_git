@@ -1,0 +1,665 @@
+---
+title: "Supplementary figures for a large-scale in silico replication project of ecological and evolutionary studies"
+author: "Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa"
+header-includes: \usepackage{amsmath}
+output:
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    keep_tex: no
+---
+
+# Set-up
+
+```{r, warning=FALSE, echo=TRUE}
+knitr::opts_chunk$set(fig.height = 5, fig.width = 12)
+set.seed(2023)
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(readr)
+  library(tidyr) 
+  library(ggplot2)
+  library(here)
+  library(RColorBrewer)
+  library(cowplot)
+  library(patchwork)
+  library(aplot)
+  library(ggplotify) 
+  library(plot3D)
+  library(stringr)
+  library(palettetown)
+  library(lisa)
+  library(wesanderson)
+  library(ggpubr)
+  })
+# function
+source(here("func","func.R"))
+# define colours
+dotCOLS = c("#74A089","#a6d8f0")
+barCOLS = c("#0B775E","#008fd5")
+# theme
+col.p <- pokepal(pokemon = 17)
+theme_custom <- ggplot2::theme_grey() +
+    ggplot2::theme(text = element_text(color = col.p[4]),
+                   axis.text = element_text(color = col.p[4]),
+                   axis.ticks = element_line(color = col.p[4]),
+                   legend.background = element_blank(),
+                   legend.box.background = element_blank(),
+                   legend.key = element_rect(fill = lisa_palette("KatsushikaHokusai")[5]),
+          panel.background = element_rect(fill = alpha(lisa_palette("KatsushikaHokusai")[5],0.7), color = lisa_palette("KatsushikaHokusai")[5]),
+          panel.grid = element_blank(),
+          plot.background = element_rect(fill = "transparent", color = "transparent"),
+          strip.background = element_rect(fill = alpha(col.p[2], 1/3), color = "transparent"),
+          strip.text = element_text(color = col.p[4]))
+
+```
+
+
+# Figure S1
+
+```{r}
+# main dataset
+d <- read.csv(here("data/main","main_dat_processed.csv"))
+d = group_by(d,study) %>% mutate(count=n(),w=1/count) 
+# model estimates
+df=readRDS(here("data/model","df.rds"))
+p=df$p
+m=df$m
+sigma=df$sigma
+df=data.frame(z=d$z,dens=2*dmix(x=abs(d$z),p=p,m=m,s=sigma)) 
+
+p1 <- ggplot(d, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  labs(x = expression(paste(italic(z)~"statistic")), y = "", title = "Main dataset") +
+  theme_custom
+
+# SMD subset
+d_SMD <- read.csv(here("data/sensitivity","dat_processed_SMD.csv"))
+# model estimates
+df=read.csv(here("data/model","df_SMD.csv"))
+p=df$p
+m=df$m
+sigma=df$sigma
+df=data.frame(z=d_SMD$z,dens=2*dmix(x=abs(d_SMD$z),p=p,m=m,s=sigma)) 
+
+p2 <- ggplot(d_SMD, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  labs(x = expression(paste(italic(z)~"statistic")), y = "", title = "Main dataset using SMD") +
+  theme_custom
+
+
+# lnRR subset
+d_lnRR <- read.csv(here("data/sensitivity","dat_processed_lnRR.csv"))
+# model estimates
+df=read.csv(here("data/model","df_lnRR.csv"))
+p=df$p
+m=df$m
+sigma=df$sigma
+df=data.frame(z=d_lnRR$z,dens=2*dmix(x=abs(d_lnRR$z),p=p,m=m,s=sigma)) 
+
+p3 <- ggplot(d_lnRR, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  labs(x = expression(paste(italic(z)~"statistic")), y = "", title = "Main dataset using lnRR") +
+  theme_custom
+
+# Zr subset
+d_Zr <- read.csv(here("data/sensitivity","dat_processed_Zr.csv"))
+# model estimates
+df=read.csv(here("data/model","df_Zr.csv"))
+p=df$p
+m=df$m
+sigma=df$sigma
+df=data.frame(z=d_Zr$z,dens=2*dmix(x=abs(d_Zr$z),p=p,m=m,s=sigma)) 
+
+p4 <- ggplot(d_Zr, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  labs(x = expression(paste(italic(z)~"statistic")), y = "", title = "Main dataset using Zr") +
+  theme_custom
+
+
+# rob subset
+d_rob <- read.csv(here("data/sensitivity","dat_processed_rob.csv"))
+# model estimates
+df=read.csv(here("data/model","df_rob.csv"))
+p=df$p
+m=df$m
+sigma=df$sigma
+df=data.frame(z=d_rob$z,dens=2*dmix(x=abs(d_rob$z),p=p,m=m,s=sigma)) 
+
+p5 <- ggplot(d_rob, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  labs(x = expression(paste(italic(z)~"statistic")), y = "", title = "Independent dataset") +
+  theme_custom
+
+# all
+png(filename = here("figure","figs 1.png"), width = 8, height = 9, units = "in", type = "windows", res = 400)
+p1 / (p2 | p3) / (p4 + p5) + plot_annotation(tag_levels = 'A')
+dev.off()
+
+```
+
+
+
+
+# Figure S2
+
+```{r}
+# replicate rate with CIs, which were computed using the julia code
+# SMD
+df <- read.csv(here("data/model","confidence_intervals_SMD.csv"))
+names(df)[2] <- "replicate"
+p1 <- ggplot(data = df, aes(x = z, y = replicate)) +
+  geom_line(linetype="solid", color="grey", linewidth = 0.8) +
+  geom_line(data=filter(df,z>=2),linetype="solid", color = "#E7298A", linewidth = 0.8) + 
+  geom_ribbon(aes(z, ymin=lower_ci, ymax=upper_ci), 
+              fill="#E6AB02", alpha=0.5) +
+  geom_vline(xintercept = 2, linetype = "dashed", color = "grey") + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(breaks = seq(0, 10, by = 2), minor_breaks=seq(0,10,1),
+                     expand = expansion(mult = c(0, 0.025))) +
+  ylab("Replication probability") + xlab(expression(paste(italic(z)~"statistic"))) +
+  labs(colour = NULL, title = "Main dataset using SMD") + 
+  theme_custom + 
+  theme(plot.margin = grid::unit(c(0, 0, 0.2, 0), "lines"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.text = element_text(size = 12, color = "black"),
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"))
+      
+# lnRR
+df <- read.csv(here("data/model","confidence_intervals_lnRR.csv"))
+names(df)[2] <- "replicate"
+p2 <- ggplot(data = df, aes(x = z, y = replicate)) +
+  geom_line(linetype="solid", color="grey", linewidth = 0.8) +
+  geom_line(data=filter(df,z>=2),linetype="solid", color = "#E7298A", linewidth = 0.8) + 
+  geom_ribbon(aes(z, ymin=lower_ci, ymax=upper_ci), 
+              fill="#E6AB02", alpha=0.5) +
+  geom_vline(xintercept = 2, linetype = "dashed", color = "grey") + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(breaks = seq(0, 10, by = 2), minor_breaks=seq(0,10,1),
+                     expand = expansion(mult = c(0, 0.025))) +
+  ylab("Replication probability") + xlab(expression(paste(italic(z)~"statistic"))) +
+  labs(colour = NULL, title = "Main dataset using lnRR") + 
+  theme_custom + 
+  theme(plot.margin = grid::unit(c(0, 0, 0.2, 0), "lines"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.text = element_text(size = 12, color = "black"),
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"))
+
+
+
+# Zr
+df <- read.csv(here("data/model","confidence_intervals_Zr.csv"))
+names(df)[2] <- "replicate"
+p3 <- ggplot(data = df, aes(x = z, y = replicate)) +
+  geom_line(linetype="solid", color="grey", linewidth = 0.8) +
+  geom_line(data=filter(df,z>=2),linetype="solid", color = "#E7298A", linewidth = 0.8) + 
+  geom_ribbon(aes(z, ymin=lower_ci, ymax=upper_ci), 
+              fill="#E6AB02", alpha=0.5) +
+  geom_vline(xintercept = 2, linetype = "dashed", color = "grey") + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(breaks = seq(0, 10, by = 2), minor_breaks=seq(0,10,1),
+                     expand = expansion(mult = c(0, 0.025))) +
+  ylab("Replication probability") + xlab(expression(paste(italic(z)~"statistic"))) +
+  labs(colour = NULL, title = "Main dataset using Zr") + 
+  theme_custom + 
+  theme(plot.margin = grid::unit(c(0, 0, 0.2, 0), "lines"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.text = element_text(size = 12, color = "black"),
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"))
+
+# rob
+df <- read.csv(here("data/model","confidence_intervals_rob.csv"))
+names(df)[2] <- "replicate"
+p4 <- ggplot(data = df, aes(x = z, y = replicate)) +
+  geom_line(linetype="solid", color="grey", linewidth = 0.8) +
+  geom_line(data=filter(df,z>=2),linetype="solid", color = "#E7298A", linewidth = 0.8) + 
+  geom_ribbon(aes(z, ymin=lower_ci, ymax=upper_ci), 
+              fill="#E6AB02", alpha=0.5) +
+  geom_vline(xintercept = 2, linetype = "dashed", color = "grey") + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(breaks = seq(0, 10, by = 2), minor_breaks=seq(0,10,1),
+                     expand = expansion(mult = c(0, 0.025))) +
+  ylab("Replication probability") + xlab(expression(paste(italic(z)~"statistic"))) +
+  labs(colour = NULL, title = "Independent dataset") + 
+  theme_custom + 
+  theme(plot.margin = grid::unit(c(0, 0, 0.2, 0), "lines"),
+        axis.title = element_text(size = 14, color = "black"),
+        axis.text = element_text(size = 12, color = "black"),
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"))
+
+# all
+png(filename = here("figure","figS 2.png"), width = 8, height = 8, units = "in", type = "windows", res = 400)
+(p1 | p2) / (p3 + p4) + plot_annotation(tag_levels = 'A')
+dev.off()
+```
+
+
+# Figure S3
+
+```{r}
+# replicate rate with CIs, which were computed using the julia code
+# SMD
+df <- read.csv(here("data/model","CI_evidence_strength_SMD.csv"))
+names(df)[2] <- "replicate"
+strength = c("No evidence", "Weak evidence","Moderate evidence",
+             "Strong evidence","Very strong evidence")
+strength = factor(strength,
+                  levels=c("No evidence", "Weak evidence",
+                           "Moderate evidence","Strong evidence",
+                           "Very strong evidence"))
+df$strength <- strength
+df$evidence <- rep("evidence", 5)
+
+df <- df %>% mutate(evidence2 = c("32% (p = 0.1)", "39% (p = 0.05)", "55% (p = 0.01)", "73% (p = 0.001)", "84% (p = 0.0001)"))
+
+df <- df %>% mutate(evidence3 = c("(p = 0.1)", "(p = 0.05)", "(p = 0.01)", "(p = 0.001)", "(p = 0.0001)"))
+
+
+p1 <- ggplot(df, aes(x= strength, y = replicate, ymin=lower_ci, ymax=upper_ci, color = evidence, fill = evidence)) + 
+  geom_errorbar(linewidth=1) + 
+  geom_point(size=4, shape=21, colour="white", stroke = 1) +
+  scale_fill_manual(values=barCOLS[2]) +
+  scale_color_manual(values=dotCOLS[2]) +
+  geom_text(aes(label = scales::percent(replicate)), size = 4, color = "#A6761D", vjust = -2.5) + 
+  geom_text(aes(label = evidence3), size = 3.5, color = "#A6761D", vjust = 4) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), labels = scales::percent_format(accuracy=1)) + # expand = expansion(mult = c(0, 0)),
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
+  theme_minimal() + theme_custom +
+  guides(fill = "none", color = "none") +
+  labs(x = "", y = bquote(paste("Replication probability")), title = "Main dataset using SMD") +
+  theme(
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0.3,0.3,-0.3,0.3), 'cm'))
+        
+
+# lnRR
+df <- read.csv(here("data/model","CI_evidence_strength_lnRR.csv"))
+names(df)[2] <- "replicate"
+strength = c("No evidence", "Weak evidence","Moderate evidence",
+             "Strong evidence","Very strong evidence")
+strength = factor(strength,
+                  levels=c("No evidence", "Weak evidence",
+                           "Moderate evidence","Strong evidence",
+                           "Very strong evidence"))
+df$strength <- strength
+df$evidence <- rep("evidence", 5)
+
+df <- df %>% mutate(evidence2 = c("28% (p = 0.1)", "36% (p = 0.05)", "53% (p = 0.01)", "73% (p = 0.001)", "86% (p = 0.0001)"))
+
+df <- df %>% mutate(evidence3 = c("(p = 0.1)", "(p = 0.05)", "(p = 0.01)", "(p = 0.001)", "(p = 0.0001)"))
+
+
+p2 <- ggplot(df, aes(x= strength, y = replicate, ymin=lower_ci, ymax=upper_ci, color = evidence, fill = evidence)) + 
+  geom_errorbar(linewidth=1) + 
+  geom_point(size=4, shape=21, colour="white", stroke = 1) +
+  scale_fill_manual(values=barCOLS[2]) +
+  scale_color_manual(values=dotCOLS[2]) +
+  geom_text(aes(label = scales::percent(replicate)), size = 4, color = "#A6761D", vjust = -2.5) + 
+  geom_text(aes(label = evidence3), size = 3.5, color = "#A6761D", vjust = 5) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), labels = scales::percent_format(accuracy=1)) + # expand = expansion(mult = c(0, 0)),
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
+  theme_minimal() + theme_custom +
+  guides(fill = "none", color = "none") +
+  labs(x = "", y = bquote(paste("Replication probability")), title = "Main dataset using lnRR") +
+  theme(
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0.3,0.3,-0.3,0.3), 'cm'))
+
+
+# Zr
+df <- read.csv(here("data/model","CI_evidence_strength_Zr.csv"))
+names(df)[2] <- "replicate"
+strength = c("No evidence", "Weak evidence","Moderate evidence",
+             "Strong evidence","Very strong evidence")
+strength = factor(strength,
+                  levels=c("No evidence", "Weak evidence",
+                           "Moderate evidence","Strong evidence",
+                           "Very strong evidence"))
+df$strength <- strength
+df$evidence <- rep("evidence", 5)
+
+df <- df %>% mutate(evidence2 = c("34% (p = 0.1)", "42% (p = 0.05)", "58% (p = 0.01)", "74% (p = 0.001)", "85% (p = 0.0001)"))
+
+df <- df %>% mutate(evidence3 = c("(p = 0.1)", "(p = 0.05)", "(p = 0.01)", "(p = 0.001)", "(p = 0.0001)"))
+
+
+p3 <- ggplot(df, aes(x= strength, y = replicate, ymin=lower_ci, ymax=upper_ci, color = evidence, fill = evidence)) + 
+  geom_errorbar(linewidth=1) + 
+  geom_point(size=4, shape=21, colour="white", stroke = 1) +
+  scale_fill_manual(values=barCOLS[2]) +
+  scale_color_manual(values=dotCOLS[2]) +
+  geom_text(aes(label = scales::percent(replicate)), size = 4, color = "#A6761D", vjust = -2.5) + 
+  geom_text(aes(label = evidence3), size = 3.5, color = "#A6761D", vjust = 4) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), labels = scales::percent_format(accuracy=1)) + # expand = expansion(mult = c(0, 0)),
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
+  theme_minimal() + theme_custom +
+  guides(fill = "none", color = "none") +
+  labs(x = "", y = bquote(paste("Replication probability")), title = "Main dataset using Zr") +
+  theme(
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0.3,0.3,-0.3,0.3), 'cm'))
+
+# rob
+df <- read.csv(here("data/model","CI_evidence_strength_rob.csv"))
+names(df)[2] <- "replicate"
+strength = c("No evidence", "Weak evidence","Moderate evidence",
+             "Strong evidence","Very strong evidence")
+strength = factor(strength,
+                  levels=c("No evidence", "Weak evidence",
+                           "Moderate evidence","Strong evidence",
+                           "Very strong evidence"))
+df$strength <- strength
+df$evidence <- rep("evidence", 5)
+
+df <- df %>% mutate(evidence2 = c("32% (p = 0.1)", "39% (p = 0.05)", "55% (p = 0.01)", "73% (p = 0.001)", "85% (p = 0.0001)"))
+
+df <- df %>% mutate(evidence3 = c("(p = 0.1)", "(p = 0.05)", "(p = 0.01)", "(p = 0.001)", "(p = 0.0001)"))
+
+
+p4 <- ggplot(df, aes(x= strength, y = replicate, ymin=lower_ci, ymax=upper_ci, color = evidence, fill = evidence)) + 
+  geom_errorbar(linewidth=1) + 
+  geom_point(size=4, shape=21, colour="white", stroke = 1) +
+  scale_fill_manual(values=barCOLS[2]) +
+  scale_color_manual(values=dotCOLS[2]) +
+  geom_text(aes(label = scales::percent(replicate)), size = 4, color = "#A6761D", vjust = -2.5) + 
+  geom_text(aes(label = evidence3), size = 3.5, color = "#A6761D", vjust = 5) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), labels = scales::percent_format(accuracy=1)) + # expand = expansion(mult = c(0, 0)),
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
+  theme_minimal() + theme_custom +
+  guides(fill = "none", color = "none") +
+  labs(x = "", y = bquote(paste("Replication probability")), title = "Independent dataset") +
+  theme(
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0.3,0.3,-0.3,0.3), 'cm'))
+
+# all
+png(filename = here("figure","figS 3.png"), width = 8.5, height = 8, units = "in", type = "windows", res = 400)
+(p1 | p2) / (p3 + p4) + plot_annotation(tag_levels = 'A')
+dev.off()
+```
+
+
+# Figure S4
+
+```{r}
+# replicate rate with CIs, which were computed using the Julia code
+# SMD
+df <- read.csv(here("data/model","confidence_intervals_sample_size_multiplier_SMD.csv"))
+
+p1 <- df %>% ggplot() +
+  geom_line(aes(x = multiplier, y = point_estimate_2_0)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_2_0, ymax=upper_2_0), fill="#1B9E77", alpha=0.5) +
+  geom_line(aes(x = multiplier, y = point_estimate_3_3)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_3_3, ymax=upper_3_3), fill="#D95F02", alpha=0.5) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(limits = c(1, 10), breaks = seq(1, 10, by = 1),
+                     labels=paste(1:10,"x",sep=''),
+                     expand = expansion(mult = c(0.03, 0.03))) + 
+  ylab("Replication probability") + 
+  xlab(expression(paste("Relative sample size for the replication study"))) +
+  labs(title = "Main dataset using SMD") +
+  theme_custom + 
+  theme(
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0.3,0.3,0.3,0.3), 'cm')) +
+  annotate("text", x = 3, y = 0.42, label = "Weak evidence", size = 3, color = "#A6761D") +
+  annotate("text", x = 3, y = 0.80, label = "Strong evidence", size = 3, color =  "#A6761D")
+
+
+# lnRR
+df <- read.csv(here("data/model","confidence_intervals_sample_size_multiplier_lnRR.csv"))
+
+p2 <- df %>% ggplot() +
+  geom_line(aes(x = multiplier, y = point_estimate_2_0)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_2_0, ymax=upper_2_0), fill="#1B9E77", alpha=0.5) +
+  geom_line(aes(x = multiplier, y = point_estimate_3_3)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_3_3, ymax=upper_3_3), fill="#D95F02", alpha=0.5) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(limits = c(1, 10), breaks = seq(1, 10, by = 1),
+                     labels=paste(1:10,"x",sep=''),
+                     expand = expansion(mult = c(0.03, 0.03))) + 
+  ylab("Replication probability") + 
+  xlab(expression(paste("Relative sample size for the replication study"))) +
+  labs(title = "Main dataset using lnRR") +
+  theme_custom + 
+  theme(
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0.3,0.3,0.3,0.3), 'cm')) +
+  annotate("text", x = 3, y = 0.37, label = "Weak evidence", size = 3, color = "#A6761D") +
+  annotate("text", x = 3, y = 0.78, label = "Strong evidence", size = 3, color =  "#A6761D")
+
+# Zr
+df <- read.csv(here("data/model","confidence_intervals_sample_size_multiplier_Zr.csv"))
+
+p3 <- df %>% ggplot() +
+  geom_line(aes(x = multiplier, y = point_estimate_2_0)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_2_0, ymax=upper_2_0), fill="#1B9E77", alpha=0.5) +
+  geom_line(aes(x = multiplier, y = point_estimate_3_3)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_3_3, ymax=upper_3_3), fill="#D95F02", alpha=0.5) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(limits = c(1, 10), breaks = seq(1, 10, by = 1),
+                     labels=paste(1:10,"x",sep=''),
+                     expand = expansion(mult = c(0.03, 0.03))) + 
+  ylab("Replication probability") + 
+  xlab(expression(paste("Relative sample size for the replication study"))) +
+  labs(title = "Main dataset using Zr") +
+  theme_custom + 
+  theme(
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0.3,0.3,0.3,0.3), 'cm')) +
+  annotate("text", x = 3, y = 0.42, label = "Weak evidence", size = 3, color = "#A6761D") +
+  annotate("text", x = 3, y = 0.80, label = "Strong evidence", size = 3, color =  "#A6761D")
+
+
+# rob
+df <- read.csv(here("data/model","confidence_intervals_sample_size_multiplier_rob.csv"))
+
+p4 <- df %>% ggplot() +
+  geom_line(aes(x = multiplier, y = point_estimate_2_0)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_2_0, ymax=upper_2_0), fill="#1B9E77", alpha=0.5) +
+  geom_line(aes(x = multiplier, y = point_estimate_3_3)) + 
+  geom_ribbon(aes(x = multiplier, ymin=lower_ci_3_3, ymax=upper_3_3), fill="#D95F02", alpha=0.5) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
+  scale_x_continuous(limits = c(1, 10), breaks = seq(1, 10, by = 1),
+                     labels=paste(1:10,"x",sep=''),
+                     expand = expansion(mult = c(0.03, 0.03))) + 
+  ylab("Replication probability") + 
+  xlab(expression(paste("Relative sample size for the replication study"))) +
+  labs(title = "Independent dataset") +
+  theme_custom + 
+  theme(
+        panel.grid.major = element_line(color = "grey", linetype = "dotted"),
+        panel.grid.minor = element_line(color = "black", linetype = "dotted"),
+        plot.margin=unit(c(0.3,0.3,0.3,0.3), 'cm')) +
+  annotate("text", x = 3, y = 0.39, label = "Weak evidence", size = 3, color = "#A6761D") +
+  annotate("text", x = 3, y = 0.78, label = "Strong evidence", size = 3, color =  "#A6761D")
+
+
+# all
+png(filename = here("figure","figS 4.png"), width = 8.5, height = 8, units = "in", type = "windows", res = 400)
+(p1 | p2) / (p3 + p4) + plot_annotation(tag_levels = 'A')
+dev.off()
+```
+
+
+# Figure S5
+
+```{r, warning=FALSE,echo=TRUE}
+# main dataset
+# model estimates
+df=readRDS(here("data/model","df.rds"))
+p=df$p
+m=df$m
+sigma=df$sigma
+snr=rmix(10^7,p=p,m=m,s=sqrt(sigma^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+df=data.frame(power=power)
+
+quantiles <- quantile(df$power, probs = c(0.25, 0.5, 0.75))
+mean_val <- mean(df$power)
+
+p1 <- ggplot() +
+  geom_histogram(data = df, aes(x = power, y = after_stat(density)), breaks = seq(0.05, 1, length = 40), fill = "white", col = "black") +
+  scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1), expand = expansion(mult = c(0.00, 0.01))) +
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  theme_custom + 
+  labs(x = "Statistical power", y = "", title = "Main dataset") +
+  geom_vline(xintercept = quantiles, linetype = "dashed", size = 0.8, color = c("red", "green", "blue")) +
+  geom_vline(xintercept = mean_val, linetype = "dashed",  size = 0.8, color = "black") 
+
+
+
+
+# SMD
+# model estimates
+df=read.csv(here("data/model","df_SMD.csv"))
+p=df$p
+m=df$m
+sigma=df$sigma
+snr=rmix(10^7,p=p,m=m,s=sqrt(sigma^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+df=data.frame(power=power)
+
+quantiles <- quantile(df$power, probs = c(0.25, 0.5, 0.75))
+mean_val <- mean(df$power)
+
+p2 <- ggplot() +
+  geom_histogram(data = df, aes(x = power, y = after_stat(density)), breaks = seq(0.05, 1, length = 40), fill = "white", col = "black") +
+  scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1), expand = expansion(mult = c(0.00, 0.01))) +
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  theme_custom + 
+  labs(x = "Statistical power", y = "", title = "Main dataset using SMD") +
+  geom_vline(xintercept = quantiles, linetype = "dashed", size = 0.8, color = c("red", "green", "blue")) +
+  geom_vline(xintercept = mean_val, linetype = "dashed",  size = 0.8, color = "black") 
+
+
+# lnRR
+# model estimates
+df=read.csv(here("data/model","df_lnRR.csv"))
+p=df$p
+m=df$m
+sigma=df$sigma
+snr=rmix(10^7,p=p,m=m,s=sqrt(sigma^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+df=data.frame(power=power)
+
+quantiles <- quantile(df$power, probs = c(0.25, 0.5, 0.75))
+mean_val <- mean(df$power)
+
+p3 <- ggplot() +
+  geom_histogram(data = df, aes(x = power, y = after_stat(density)), breaks = seq(0.05, 1, length = 40), fill = "white", col = "black") +
+  scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1), expand = expansion(mult = c(0.00, 0.01))) +
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  theme_custom + 
+  labs(x = "Statistical power", y = "", title = "Main dataset using lnRR") +
+  geom_vline(xintercept = quantiles, linetype = "dashed", size = 0.8, color = c("red", "green", "blue")) +
+  geom_vline(xintercept = mean_val, linetype = "dashed",  size = 0.8, color = "black") 
+
+
+# Zr
+# model estimates
+df=read.csv(here("data/model","df_Zr.csv"))
+p=df$p
+m=df$m
+sigma=df$sigma
+snr=rmix(10^7,p=p,m=m,s=sqrt(sigma^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+df=data.frame(power=power)
+
+quantiles <- quantile(df$power, probs = c(0.25, 0.5, 0.75))
+mean_val <- mean(df$power)
+
+p4 <- ggplot() +
+  geom_histogram(data = df, aes(x = power, y = after_stat(density)), breaks = seq(0.05, 1, length = 40), fill = "white", col = "black") +
+  scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1), expand = expansion(mult = c(0.00, 0.01))) +
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  theme_custom + 
+  labs(x = "Statistical power", y = "", title = "Main dataset using Zr") +
+  geom_vline(xintercept = quantiles, linetype = "dashed", size = 0.8, color = c("red", "green", "blue")) +
+  geom_vline(xintercept = mean_val, linetype = "dashed",  size = 0.8, color = "black") 
+
+
+# rob
+# model estimates
+df=read.csv(here("data/model","df_rob.csv"))
+p=df$p
+m=df$m
+sigma=df$sigma
+snr=rmix(10^7,p=p,m=m,s=sqrt(sigma^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+df=data.frame(power=power)
+
+quantiles <- quantile(df$power, probs = c(0.25, 0.5, 0.75))
+mean_val <- mean(df$power)
+
+p5 <- ggplot() +
+  geom_histogram(data = df, aes(x = power, y = after_stat(density)), breaks = seq(0.05, 1, length = 40), fill = "white", col = "black") +
+  scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1), expand = expansion(mult = c(0.00, 0.01))) +
+  scale_y_continuous(expand = expansion(mult = c(0.00, 0.00))) +
+  theme_custom + 
+  labs(x = "Statistical power", y = "", title = "Independent dataset") +
+  geom_vline(xintercept = quantiles, linetype = "dashed", size = 0.8, color = c("red", "green", "blue")) +
+  geom_vline(xintercept = mean_val, linetype = "dashed",  size = 0.8, color = "black") 
+
+# all
+png(filename = here("figure","figS 5.png"), width = 8, height = 9, units = "in", type = "windows", res = 400)
+p1 / (p2 | p3) / (p4 + p5) + plot_annotation(tag_levels = 'A')
+dev.off()
+```
+

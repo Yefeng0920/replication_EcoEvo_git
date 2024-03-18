@@ -1,0 +1,444 @@
+---
+title: A large-scale in silico replication project of ecological and evolutionary
+  studies
+author: "Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa"
+header-includes: \usepackage{amsmath}
+output:
+  word_document:
+    toc: yes
+    toc_depth: '2'
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    keep_tex: no
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+# Packages
+
+```{r, warning=FALSE, echo=TRUE}
+knitr::opts_chunk$set(fig.height = 8, fig.width = 10)
+set.seed(2023)
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(readr)
+  library(tidyr) 
+  library(ggplot2)
+  library(aplot)
+  library(ggplotify) 
+  library(here)
+  library(patchwork)
+  library(plot3D)
+  })
+# functions
+source(here("func","func.R"))
+```
+
+# Data
+
+The database comprised 466 meta-analytic datasets and 111,321 observations of ecological and evolutionary effects, curated by Costello and Fox. These datasets were obtained through a systematic search of meta-analysis papers indexed in Web of Science categories relevant to ecology and evolutionary biology. We eliminated effect size estimates with zero and missing sampling variances.
+
+The 466 meta-analytic datasets encompassed diverse research topics within ecology and evolutionary biology. However, it is important to realize that the trials in our dataset are not a random sample of all the trials in the research field, and may therefore not be entirely representative.
+
+Furthermore, it is well known that trials that do not reach statistical significance have a lower chance of publication. We do not know the extent of this "publication bias" and we do not take it into account.
+
+Import the main data (the `.csv` file named `main_dat.csv`).
+
+```{r}
+dat_all <- read.csv(here("data/main","main_dat.csv")) 
+head(dat_all)
+```
+
+Clean the dataset
+
+```{r,warning=FALSE}
+# basic cleaning 
+dat_all <- dat_all[!is.na(dat_all$eff.size) & !is.na(dat_all$var.eff.size), ] # remove NAs
+dat_all <- dat_all[dat_all$var.eff.size != 0, ] # remove negative and zero variance (sampling variance should be positive)
+
+# classify effect size measures
+grouped_es <- NA
+grouped_es[dat_all$eff.size.measure == "cohens.d"|
+           dat_all$eff.size.measure == "hedges.d"|
+           dat_all$eff.size.measure == "hedges.g"|
+           dat_all$eff.size.measure == "abs.hedges.d"|
+           dat_all$eff.size.measure == "SMD"] <- c("SMD") # (1) SMD: cohens.d,  hedges.d, hedges.g, abs.hedges.d, SMD
+grouped_es[dat_all$eff.size.measure == "log.ratio"] <- c("lnRR") # (2) lnRR: log.ratio
+grouped_es[dat_all$eff.size.measure == "z.r"] <- c("Zr") # (3) Zr: z.r
+# (4) binary: IRR, log.odds.ratio
+#grouped_es[dat_all$eff.size.measure == "IRR" | 
+#           dat_all$eff.size.measure == "log.odds.ratio"] <- c("binary") 
+grouped_es[dat_all$eff.size.measure == "mean.diff" |
+           dat_all$eff.size.measure == "reg.slope" | 
+           dat_all$eff.size.measure == "IRR" | 
+           dat_all$eff.size.measure == "log.odds.ratio"] <- c("uncommon") # (5) uncommon: mean.diff, reg.slope
+dat_all$grouped_es <- as.factor(grouped_es)
+
+
+# only select relevant variables
+dat <- dat_all %>% dplyr::select(paper.id, meta.analysis.paper, meta.analysis.id, meta.analysis.year, study, study.year, eff.size.measure, grouped_es, eff.size, var.eff.size)
+
+dat <- dat %>% mutate(se.eff.size = sqrt(var.eff.size)) # create the variable of sampling error
+dat <- dat %>% mutate(z = eff.size/se.eff.size) # calculate z value
+
+# create a variable to label each MA
+dat$MA_case <- paste("MA", dat$meta.analysis.id, sep = "_")
+
+# make a copy
+d <- dat
+
+nrow(d)                               # number of estimates
+length(unique(dat$study))             # number of unique studies
+length(unique(dat$meta.analysis.id))  # number of meta-analyses
+
+```
+
+We plot the $z$-statistics.
+
+```{r, warning=FALSE, echo=FALSE}
+d=subset(d,!is.na(z))
+
+ggplot(d, aes(x = z)) + 
+  geom_histogram(aes(y = ..density..), color="black", 
+                 fill="white", bins=80) +
+  xlim(-20,20) + xlab("z-statistic") + ylab('') + theme_bw()
+```
+
+# Modelling
+
+For each observation in the database, let $ES$ denote the (unobservable!) true or population effect size, and $\overline{ES}$ be the observed effect size. We assume that $\overline{ES}$ a normally distributed, unbiased estimate of the true effect $ES$ with a known sampling standard deviation (aka standard error) $SE$. So, 
+$$\overline{ES} \sim {\cal N}(ES,SE^2)$$
+
+The main effect size measures in our database are standardized mean differences (SMD; 45%), log-transformed response ratios (lnRR; 36%), and Fisher’s z-transformed correlations (15%). For these measures, it is reasonable (and customary) to assume normality. The z-statistic is defined as 
+$$z= \overline{ES} / SE$$
+If the absolute value of the z-statistic exceed 1.96 then the observed effect is "statistically significantly" different from zero at significance level $\alpha=0.05$ (two-sided). 
+
+Finally, we define the signal-noise-ratio ($SNR$) as the strength of true effect size (the signal) relative standard error of the estimate (the noise),
+$$SNR = ES / SE$$
+It follows from our assumptions that
+$$z \sim {\cal N}(SNR,1)$$
+In other words, we can think if the z-statistic as the sum of the signal-to-noise ratio and a standard normal error term.
+
+
+## z-statistic
+
+We start by estimating the distribution of the z-statistics across the trials in our dataset.
+We use the method of maximum likelihood. We will assume that the z-statistics follow a mixture of zero-mean normal distributions. We can write this distribution as
+
+$$g(z) = \sum_{i=1}^4 p_i \varphi(z/\sigma_i)/\sigma_i$$
+where $\varphi$ is the density of the standard normal distribution, and the mixture probabilities $p_i$ (or "weights") are non-negative and sum to one. That is, $p_i \geq 0 $ and $\sum_{i=1}^4 p_i=1$.
+
+By fitting a symmetric distribution to the observed $z$-statistics, we are ignoring their signs. Put differently, by fitting a mixture of zero-mean normals to the z-stats, we are essentially fitting a mixture of half-normals to the _absolute_ z-stats.
+
+Since the z-statistics are the sum of the signal-to-noise ratio and a standard normal error term, the standard deviations $\sigma_i$ of the mixture components must be at least 1. So, we run a constrained optimization to find the maximum likelihood estimates. The constraints are:
+
+* $p_i \geq 0,\quad (i=1,2,3,4)$
+* $\sum_{i=1}^4 p_i=1$
+* $\sigma_i \geq 1,\quad (i=1,2,3,4)$
+
+Some studies have multiple outcomes, so we weight each study inversely proportional to how often it appears in our data set. 
+
+```{r, warning=FALSE, echo=TRUE, eval=TRUE, cache=TRUE}
+# count number of outcomes per study
+d = group_by(d,study) %>% mutate(count=n(),w=1/count) 
+# censor two extreme z values at, say, -100 and 100, respectively
+d$z[d$z == max(d$z)] = 100
+d$z[d$z == min(d$z)] = -100
+
+df=mix(z=d$z,k=4,c1=0,c2=10,weights=d$w)
+p=df$p
+m=df$m
+sigma=df$sigma
+round(df,2)
+```
+
+We plot the _weighted_ histogram of the absolute $z$-statistics together with the fitted mixture. We see that the mixture fits quite well.
+
+```{r, warning=FALSE, echo=FALSE}
+df=data.frame(z=d$z,dens=2*dmix(x=abs(d$z),p=p,m=m,s=sigma)) 
+
+ggplot(d, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  labs(x = expression(paste(italic(z)~"statistic")), y = "Density") +
+  theme_bw()
+```
+
+## SNR
+
+As we discussed, the z-statistics are the sum of the signal-to-noise ratio and a standard normal error term. Therefore it is easy to obtain the distribution of the SNRs from the distribution of the $z$-statistics. We simply subtract 1 from variances of the mixture components. So, the distribution of the SNRs can be written as
+$$f(x) = \sum_{i=1}^4 p_i \varphi(x/\tau_i)/\tau_i$$
+where $\tau_i = \sqrt{\sigma_i^2 - 1}$.
+
+## Joint distribution
+
+We have now estimated the marginal distributions of the z-statistics and the SNRs. But we also know the _conditional_ distribution of the z-statistic given the SNR (it's normal with mean SNR and standard deviation 1). This means that we have the _joint_ distribution of the z-statistics the SNRs.
+
+Finally, we can use the well-known theory of bivariate normal distributions to obtain the conditional distribution of the SNR given the observed z-statistic.
+
+
+We show the joint distribution of z and SNR.
+
+```{r}
+djoint <- function(x,y,p,m,s) { 
+  dmix(y,p,m,s)*dnorm(x-y,mean=0,sd=1)  # conditional on SNR, z ~ N(SNR,1)
+}
+
+x <- seq(-10, 10, length.out = 80)
+y <- x 
+z <- outer(x, y, djoint, p=p,m=m,s=sqrt(sigma^2-1))
+# set margins
+par(oma = c(0, 0, 1, 1))  # set the outer margin to control the overall space around the plot
+par(mar = c(1, 0, 0, 0)) # set the inner margin (mar) - especially the bottom
+# joint distribution
+zlim <- c(0, 0.048) # set the z-axis limits
+# define custom z-tick positions
+zticks <- seq(zlim[1], zlim[2], length.out = 5)
+# trans3d is used to convert the 3D coordinates to 2D screen coordinates, and text is used to add text annotations. 
+joint.3D <- persp3D(x = x, 
+        y = y,
+        z = z,
+        theta = 40, phi = 20, expand = 0.6, 
+        facets = FALSE, 
+        col="black",
+        xlab = "z statistic", ylab = "SNR (signal noise ratio)",zlab="Density",
+        ticktype="detailed", nticks = 5,
+        cex.lab = 1,
+        cex.axis = 0.8,
+        zlim = zlim,
+        zticks = list(at = zticks)) 
+text(trans3d(x = min(x) + 2.5, y = min(y) - 3.8, z = 0.052, joint.3D), labels = "", font = 2, cex = 1.3) 
+
+# marginal distribution of z (up to scale factor)
+x_z=seq(-2.8,10,0.01)
+z_z=drop(p %*% sapply(x_z, function(x) dnorm(x,mean=m,sd=sigma)))/3.7
+lines(trans3d(x_z,y=10,z=z_z,joint.3D),col="red",lwd=2)
+
+# marginal distribution of SNR (up to scale factor)
+y_snz=seq(-10,3.8,0.01)
+z_snz=drop(p %*% sapply(y_snz, function(x) dnorm(x,mean=m,sd=sigma)))/3.7 
+lines(trans3d(x=-10,y=y_snz,z=z_snz,joint.3D),col="red",lwd=2)
+```
+
+
+
+# Estimates
+
+We can use the estimated joint distribution of the z-statistics and the SNRs to calculate the statistical power and replicability for the 111,321 observed ecological and evolutionary effects. 
+
+## Power
+
+The "achieved" or "actual" power is simply the probability of reaching statistical significance (two-sided, level $\alpha=0.05$). Obviously, this probability depends on the true effect size and on the standard error of the estimate. Under our assumptions, this can be expressed in terms of the SNR. 
+
+$$\text{power}(SNR)=\Phi(-1.96 - SNR) + 1 - \Phi(1.96 - SNR).$$
+where $\Phi$ is the cumulative distribution function (CDF) of the standard normal distribution. Once again: This is the power against the _true_ effect. Of course, the true effect is never known. However, since we can estimate the distribution of the SNR across the studies in our dataset, we can also estimate the distribution of the power across a large number of studies.
+
+Note 1: The power against the true effect should not to be confused with the power the study is designed for. Most studies are designed to have 80% or 90% against some effect that is considered important or plausible (or both). 
+
+Note 2: The power against the true effect should also not be confused with the "observed" of "post hoc" power.
+
+Since the power against the true effect is a function of the SNR, we can obtain its distribution by transforming the distribution of the SNR. We generate a sample of size $10^7$ from the (estimated) distribution of the SNRs, and then we apply the transformation to get a sample from the distribution of the power.
+
+```{r, warning=FALSE,echo=TRUE}
+snr=rmix(10^7,p=p,m=m,s=sqrt(sigma^2 - 1))
+power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
+df=data.frame(power=power)
+```
+
+We can now show the power distribution with a histogram.
+
+```{r , warning=FALSE,echo=FALSE}
+ggplot(df, aes(x=power, y=after_stat(density))) +
+  geom_histogram(breaks=seq(0.05,1,length=40),fill="white",col="black") + 
+  scale_x_continuous(breaks = seq(0,1,0.1), limits=c(0,1)) +
+  theme_bw() + labs(x="power (whole dataset)",y="")
+```
+
+Based on the estimated distribution of the SNR, the average power can be calculated.
+
+```{r}
+summary(power)
+```
+
+We also have a direct estimate of the mean power, namely the weighted proportion of significant results.
+
+```{r}
+sum(d$w*(abs(d$z)>1.96))/sum(d$w)
+```
+
+
+## Replication
+
+Suppose we have conducted a study and obtained the z-statistic $z$. Now consider a (hypothetical) replication study with exactly the same design (the same effect, sample size, standard error, etc.) Now consider the event that the replication is "successful" in the sense that it reaches statistical significance in the same direction as the original study, i.e.
+
+$$ z \times z_{\text{repl}} > 0 \ \ \text{and}\ \  |z_{\text{repl}}| > 1.96$$
+
+Using simulation, we can easily compute mean replication for the whole data set, both unconditionally and conditionally on statistical significance
+
+```{r, echo=TRUE}
+snr=rmix(10^7,p=p,m=m,s=sqrt(sigma^2 - 1))
+z.orig=snr + rnorm(10^7) # original
+z.repl = snr + rnorm(10^7) # replication
+replicate=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate)                    # unconditional probability of replication
+mean(replicate[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+
+We can also compute the conditional probability of "successful replication" given the absolute value of the $z$-statistic of the original study. The symmetry of the distribution of the $z$-statistic implies that the conditional probability of "successful replication" given $|Z|=z$ is equal to the conditional probability given $Z=z$.
+
+```{r, echo=TRUE, warning=FALSE}
+replicate=sapply(d$z,replcalc,p=p,m=m,s=sqrt(sigma^2-1))
+```
+
+We can verify the unconditional and conditional probability of "successful replication" by averaging over the empirical distribution of the observed $z$-statistics.
+
+```{r, echo=TRUE}
+sum(d$w*replicate)/sum(d$w)   # unconditional probability of replication
+
+ind=which(abs(d$z)>1.96)
+sum(d$w[ind]*replicate[ind])/sum(d$w[ind])  # conditional probability of replication given |z|>1.96
+```
+
+
+Replication rate curve.
+
+```{r}
+# pdf of the z-stats
+density=dmix(d$z,p,m,sigma)
+
+df=data.frame(z=abs(d$z),replicate=replicate,density=density)
+
+replicate.dist <- ggplot(data=df, aes(x = z, y = replicate)) + 
+  geom_line(linetype="dashed") +
+  geom_line(data=filter(df,z>1.96),linetype="solid") +        
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01))) +
+  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2), 
+                     expand = expansion(mult = c(0, 0.01))) +
+  ylab("Replication rate") + xlab(expression(paste(italic(z)~"statistic"))) +
+  labs(colour = NULL) + 
+  theme_bw() + 
+  theme(axis.title = element_text(size = 14),
+        axis.text = element_text(size = 12))
+
+top.dist2 <- ggplot(data=df, aes(x = z,y=density)) +
+  geom_line(linetype="dashed")+
+  geom_ribbon(data=filter(df,z>1.96),aes(z, ymax=density, ymin=0), 
+              fill="grey") +
+  geom_line(data=filter(df,z>1.96),linetype="solid") +
+  scale_x_continuous(limits = c(0, 10), expand = expansion(mult = c(0, 0.01))) +
+  labs(x = "", y = "") + 
+  theme_void() +
+  theme(plot.margin = grid::unit(c(0, 0, 0, 0), "lines"))
+
+replicate.top.dist <- suppressWarnings(as.ggplot(insert_top(
+   replicate.dist, top.dist2, height = 0.5)))                        
+replicate.top.dist + plot_layout(tag_level = 'new') +
+  plot_annotation(tag_levels = list(c(''))) & 
+  theme(plot.tag = element_text(size = 16, face = "bold"))
+```
+
+We show the conditional replication rates at selected z-values, re-formulated as the scales of evidence strength according to according to Bland M. 2015. An Introduction to Medical Statistics. Oxford, UK: Oxford Univ. Press. 4th ed. We covert z-values to two-sided p-values. Our purpose is to build up the intuitive relationship between the replication rates and evidence strength, albeit interpreting z-values (or, equivalently, p-values) as evidence strength is controversial (see **Notes**).
+
+**Notes:**
+
+The "scales of evidence" (like "no evidence", "weak evidence",...) are quite problematic, see Efron, B., Gous, A., Kass, R. E., Datta, G. S., & Lahiri, P. (2001). Scales of evidence for model selection: Fisher versus Jeffreys. Lecture Notes-Monograph Series, 208-256. It's even doubtful if p-values can be taken as measures of evidence at all. As Wasserstein puts it: "By itself, a p-value does not provide a good measure of evidence regarding a model or hypothesis." See Wasserstein, R. L., & Lazar, N. A. (2016). The ASA statement on p-values: context, process, and purpose. The American Statistician, 70(2), 129-133.
+
+
+```{r}
+pval=c(0.1,0.05,0.01,0.001,0.0001)
+strength = c("No evidence", "Weak evidence","Moderate evidence",
+             "Strong evidence","Very strong evidence")
+strength = factor(strength,
+                  levels=c("No evidence", "Weak evidence",
+                           "Moderate evidence","Strong evidence",
+                           "Very strong evidence"))
+zval=qnorm(1 - pval/2)
+replicate=sapply(zval,replcalc,p=p,m=m,s=sqrt(sigma^2-1))
+replicate=round(replicate,2)
+replicate_typical <- data.frame(strength, replicate)
+data.frame(strength,pval,zval,replicate)
+
+# figure
+replicate_typical.p <- ggplot(replicate_typical, aes(x = replicate, y = strength)) +
+  geom_segment(aes(x = 0, y = strength, xend = replicate, yend = strength)) +
+  geom_point(aes(size = replicate)) +
+  scale_size(range=c(8,15)) +
+  geom_text(aes(label = scales::percent(replicate)), size = 3.5, color = "white") + 
+  annotate("text", x = replicate[1] + 0.164, y = 1, label = 'paste("[", italic(p), "= 0.1,"~"z = 1.64", "]", sep = "")', parse = TRUE, size = 3.5) +
+annotate("text", x = replicate[2] + 0.181, y = 2, label = 'paste("[", italic(p), "= 0.05,"~"z = 1.96", "]", sep = "")', parse = TRUE, size = 3.5) +
+annotate("text", x = replicate[3] + 0.185, y = 3, label = 'paste("[", italic(p), "= 0.01,"~"z = 2.576", "]", sep = "")', parse = TRUE, size = 3.5) +
+annotate("text", x = replicate[4] + 0.208, y = 4, label = 'paste("[", italic(p), "= 0.001,"~"z = 3.29", "]", sep = "")', parse = TRUE, size = 3.5) +
+annotate("text", x = replicate[5] + 0.228, y = 5, label = 'paste("[", italic(p), "= 0.0001,"~"z = 3.89", "]", sep = "")', parse = TRUE, size = 3.5) +
+  guides(size = "none") +
+  xlab("Replication rate") + 
+  labs(colour = NULL, y = "") +
+  theme_bw() + 
+  theme(axis.title = element_text(size = 18),
+        axis.text.x = element_text(size = 16),
+        axis.text.y = element_text(size = 18),
+        plot.margin=unit(c(0,0,0,0), 'cm')) + 
+  scale_x_continuous(limits = c(0, 1.25), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), expand = expansion(mult = c(0, 0))) 
+
+replicate_typical.p
+```
+
+
+## Sample size multiplier
+
+If the sample size of the replication study is twice as large as that of the original study, then the SNR of the replication study will be larger by a factor square root of 2. Thus, we can also compute the conditional probability of a successful replication given the z-statistic of the original study when the replication study is larger (or smaller) by some factor.
+
+Conditional replication rates when the original study has $z=2$ or $z=3.3$ and the replication study is $1,2,\dots,10$ times larger.
+
+```{r}
+# calculate replication probabilities when multiplying the 
+# sample size of the original study with factors 1,2,...10.
+replicate_rep_weak = sapply(1:10, function(x) replcalc(2, p=p, m=m, s=sqrt(sigma^2-1), multiplier = x))
+replicate_rep_strong = sapply(1:10, function(x) replcalc(3.3, p=p, m=m, s=sqrt(sigma^2-1), multiplier = x))
+
+# prepare a data frame
+replicate_multiplier <- data.frame(evidence = c(rep("Weak evidence", 10), 
+                                                rep("Strong evidence", 10)), 
+                                   mult_values = rep(1:10, 2), 
+                                   replicate = c(replicate_rep_weak, 
+                                                 replicate_rep_strong))
+# round
+replicate_multiplier$replicate <- round(replicate_multiplier$replicate, 2)
+# data frame
+replicate_multiplier
+# figure
+replicate_multiplier.p <- replicate_multiplier %>% 
+  ggplot(aes(x = mult_values, y = replicate, color = evidence, fill = evidence)) +
+  geom_point(color = "transparent") +
+  geom_line(alpha=1, linewidth = 0.5) + 
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05), 
+                     expand = expansion(mult = c(0, 0.01))) +
+  scale_x_continuous(limits = c(1, 10), breaks = seq(1, 10, by = 1),
+                     labels=paste(1:10,"x",sep=''),
+                     expand = expansion(mult = c(0.03, 0.03))) + 
+  ylab("Replication probability") + 
+  xlab(expression(paste("Relative sample size for the replication study"))) +
+  geom_point(data = replicate_multiplier, aes(size = replicate)) +  
+  #scale_size(range=c(8,15)) +
+  geom_text(data = replicate_multiplier, 
+            aes(label = scales::percent(replicate)), size = 3.5, color = "gray10") +
+  guides(size = "none", color = "none", fill = "none") +
+  labs(colour = NULL) + 
+  theme_bw() + 
+  theme(axis.title = element_text(size = 18),
+        axis.text = element_text(size = 16),
+        plot.margin=unit(c(0.2,0.3,0,0), 'cm')) +
+  annotate("text", x = 3, y = 0.5, label = "Weak evidence", size = 4) +
+  annotate("text", x = 3, y = 0.85, label = "Strong evidence", size = 4)
+replicate_multiplier.p
+```

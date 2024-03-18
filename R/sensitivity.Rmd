@@ -1,0 +1,429 @@
+---
+title: "Sensitivity analysis for a large-scale in silico replication project of ecological and evolutionary studies"
+author: "Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa"
+header-includes: \usepackage{amsmath}
+output:
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    keep_tex: no
+---
+
+# Packages
+
+```{r, warning=FALSE, echo=TRUE}
+knitr::opts_chunk$set(fig.height = 5, fig.width = 12)
+set.seed(2023)
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(here)
+  library(readr)
+  library(tidyr) 
+  library(ggplot2)
+  library(aplot)
+  library(metafor)
+  library(ggplotify) 
+  library(patchwork)
+  library(plot3D)
+  })
+# functions
+source(here("func","func.R"))
+```
+
+
+# Data
+
+We conduct subset analyses by split the main dataset (`main_dat.csv`) according to different types of effect size measures.
+
+Standardized mean difference (SMD):
+
+```{r,warning=FALSE}
+# SMD
+d_SMD <- read.csv(here("data/sensitivity","dat_processed_SMD.csv"))
+```
+
+Log response ratio (lnRR):
+
+```{r,warning=FALSE}
+# lnRR
+d_lnRR <- read.csv(here("data/sensitivity","dat_processed_lnRR.csv"))
+```
+
+Fisher's r-to-Zr (Zr):
+
+```{r,warning=FALSE}
+# Zr
+d_Zr <- read.csv(here("data/sensitivity","dat_processed_Zr.csv"))
+```
+
+
+We also use an independent dataset to test the repeatability of the results.
+
+```{r, warning=FALSE, echo=TRUE}
+# robust
+d_rob <- read.csv(here("data/sensitivity","dat_processed_rob.csv"))
+```
+
+
+# Modelling
+
+We estimate the distribution of the z-statistics across the trials for each type effect size measure.
+
+## SMD
+
+```{r, warning=FALSE, echo=TRUE, eval=TRUE}
+# SMD
+# fit data
+# df=mix(z=d_SMD$z,k=4,c1=0,c2=10,weights=d_SMD$w)
+# alternative, load the pre-fitted model
+df=read.csv(here("data/model","df_SMD.csv"))
+p_SMD=df$p
+m=df$m
+sigma_SMD=df$sigma
+```
+
+
+## lnRR
+```{r, warning=FALSE, echo=TRUE, eval=TRUE}
+# lnRR
+# fit data
+# df=mix(z=d_lnRR$z,k=4,c1=0,c2=10,weights=d_lnRR$w)
+# alternative, load the pre-fitted model
+df=read.csv(here("data/model","df_lnRR.csv"))
+p_lnRR=df$p
+m=df$m
+sigma_lnRR=df$sigma
+```
+
+## Zr
+```{r, warning=FALSE, echo=TRUE, eval=TRUE}
+# Zr
+# fit data
+df=mix(z=d_Zr$z,k=4,c1=0,c2=10,weights=d_Zr$w)
+# alternative, load the pre-fitted model
+df=read.csv(here("data/model","df_Zr.csv"))
+p_Zr=df$p
+m=df$m
+sigma_Zr=df$sigma
+```
+
+## Independent
+
+We estimate the distribution of the z-statistics across the trials for the independent dataset.
+
+```{r, warning=FALSE, echo=TRUE, eval=TRUE}
+# robust
+# fit data
+df=mix(z=d_rob$z,k=4,c1=0,c2=10,weights=d_rob$w)
+# alternative, load the pre-fitted model
+df=read.csv(here("data/model", "df_rob.csv"))
+p_rob=df$p
+m=df$m
+sigma_rob=df$sigma
+```
+
+We plot the _weighted_ histogram of the absolute $z$-statistics together with the fitted mixture. We see that the mixture fits quite well.
+
+SMD: 
+```{r, warning=FALSE, echo=FALSE}
+# SMD
+df=data.frame(z=d_SMD$z,dens=2*dmix(x=abs(d_SMD$z),p=p_SMD,m=m,s=sigma_SMD)) 
+ggplot(d_SMD, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  labs(x = expression(paste(italic(z)~"statistic (SMD)")), y = "Density") +
+  theme_bw()
+```
+
+lnRR: 
+```{r, warning=FALSE, echo=FALSE}
+# lnRR
+df=data.frame(z=d_lnRR$z,dens=2*dmix(x=abs(d_lnRR$z),p=p_lnRR,m=m,s=sigma_lnRR)) 
+ggplot(d_lnRR, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  labs(x = expression(paste(italic(z)~"statistic (lnRR)")), y = "Density") +
+  theme_bw()
+```
+
+Zr: 
+```{r, warning=FALSE, echo=FALSE}
+# Zr
+df=data.frame(z=d_Zr$z,dens=2*dmix(x=abs(d_Zr$z),p=p_Zr,m=m,s=sigma_Zr)) 
+ggplot(d_Zr, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  labs(x = expression(paste(italic(z)~"statistic (Zr)")), y = "Density") +
+  theme_bw()
+```
+
+Robust data:
+```{r, warning=FALSE, echo=FALSE}
+# rob
+df=data.frame(z=d_rob$z,dens=2*dmix(x=abs(d_rob$z),p=p_rob,m=m,s=sigma_rob)) 
+ggplot(d_rob, aes(x = abs(z))) +
+  geom_histogram(aes(y = after_stat(density), weight = w),
+                 breaks=seq(0,20,0.5),fill = "white",color="black") +
+  geom_line(data=df,aes(x=z,y=dens), alpha=1, linewidth = 0.8) +
+  xlim(0,20) + 
+  labs(x = expression(paste(italic(z)~"statistic (robust data)")), y = "Density") +
+  theme_bw()
+```
+
+
+# Estimates
+
+## Power
+
+### SMD
+```{r, warning=FALSE,echo=TRUE}
+snr_SMD=rmix(10^7,p=p_SMD,m=m,s=sqrt(sigma_SMD^2 - 1))
+power_SMD=pnorm(-1.96,snr_SMD,1) + 1 - pnorm(1.96,snr_SMD,1)
+```
+
+Based on the estimated distribution of the SNR, the average power can be calculated.
+
+```{r}
+summary(power_SMD)
+```
+
+We also have a direct estimate of the mean power, namely the weighted proportion of significant results.
+
+```{r}
+sum(d_SMD$w*(abs(d_SMD$z)>1.96))/sum(d_SMD$w)
+```
+
+### lnRR
+```{r, warning=FALSE,echo=TRUE}
+snr_lnRR=rmix(10^7,p=p_lnRR,m=m,s=sqrt(sigma_lnRR^2 - 1))
+power_lnRR=pnorm(-1.96,snr_lnRR,1) + 1 - pnorm(1.96,snr_lnRR,1)
+```
+
+Based on the estimated distribution of the SNR, the average power can be calculated.
+
+```{r}
+summary(power_lnRR)
+```
+
+We also have a direct estimate of the mean power, namely the weighted proportion of significant results.
+
+```{r}
+sum(d_lnRR$w*(abs(d_lnRR$z)>1.96))/sum(d_lnRR$w)
+```
+
+### Zr
+```{r, warning=FALSE,echo=TRUE}
+snr_Zr=rmix(10^7,p=p_Zr,m=m,s=sqrt(sigma_Zr^2 - 1))
+power_Zr=pnorm(-1.96,snr_Zr,1) + 1 - pnorm(1.96,snr_Zr,1)
+```
+
+Based on the estimated distribution of the SNR, the average power can be calculated.
+
+```{r}
+summary(power_Zr)
+```
+
+We also have a direct estimate of the mean power, namely the weighted proportion of significant results.
+
+```{r}
+sum(d_Zr$w*(abs(d_Zr$z)>1.96))/sum(d_Zr$w)
+```
+
+### Independent
+```{r, warning=FALSE,echo=TRUE}
+snr_rob=rmix(10^7,p=p_rob,m=m,s=sqrt(sigma_rob^2 - 1))
+power_rob=pnorm(-1.96,snr_rob,1) + 1 - pnorm(1.96,snr_rob,1)
+```
+
+Based on the estimated distribution of the SNR, the average power can be calculated.
+
+```{r}
+summary(power_rob)
+```
+
+We also have a direct estimate of the mean power, namely the weighted proportion of significant results.
+
+```{r}
+sum(d_rob$w*(abs(d_rob$z)>1.96))/sum(d_rob$w)
+```
+
+## Replication
+
+Using simulation, we can easily compute mean replication for the whole data set, both unconditionally and conditionally on statistical significance.
+
+## SMD
+```{r, echo=TRUE}
+z.orig=snr_SMD + rnorm(10^7) # original
+z.repl = snr_SMD + rnorm(10^7) # replication
+replicate_SMD=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate_SMD)                    # unconditional probability of replication
+mean(replicate_SMD[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+## lnRR
+```{r, echo=TRUE}
+z.orig=snr_lnRR + rnorm(10^7) # original
+z.repl = snr_lnRR + rnorm(10^7) # replication
+replicate_lnRR=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate_lnRR)                    # unconditional probability of replication
+mean(replicate_lnRR[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+## Zr
+```{r, echo=TRUE}
+z.orig=snr_Zr + rnorm(10^7) # original
+z.repl = snr_Zr + rnorm(10^7) # replication
+replicate_Zr=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate_Zr)                    # unconditional probability of replication
+mean(replicate_Zr[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+## Robust
+```{r, echo=TRUE}
+z.orig=snr_rob + rnorm(10^7) # original
+z.repl = snr_rob + rnorm(10^7) # replication
+replicate_rob=(z.orig * z.repl > 0) & (abs(z.repl) > 1.96)
+mean(replicate_rob)                    # unconditional probability of replication
+mean(replicate_rob[abs(z.orig)>1.96])  # conditional probability of replication given |z|>1.96
+```
+
+## Typical z values
+
+The conditional replication rates at selected z-values.
+
+SMD:
+
+```{r}
+pval=c(0.1,0.05,0.01,0.001,0.0001)
+strength = c("No evidence", "Weak evidence","Moderate evidence",
+             "Strong evidence","Very strong evidence")
+strength = factor(strength,
+                  levels=c("No evidence", "Weak evidence",
+                           "Moderate evidence","Strong evidence",
+                           "Very strong evidence"))
+zval=qnorm(1 - pval/2)
+replicate=sapply(zval,replcalc,p=p_SMD,m=m,s=sqrt(sigma_SMD^2-1))
+replicate=round(replicate,2)
+replicate_typical <- data.frame(strength, replicate)
+data.frame(strength,pval,round(zval,2),replicate)
+```
+
+lnRR:
+
+```{r}
+replicate=sapply(zval,replcalc,p=p_lnRR,m=m,s=sqrt(sigma_lnRR^2-1))
+replicate=round(replicate,2)
+replicate_typical <- data.frame(strength, replicate)
+data.frame(strength,pval,round(zval,2),replicate)
+```
+
+Zr:
+
+```{r}
+replicate=sapply(zval,replcalc,p=p_Zr,m=m,s=sqrt(sigma_Zr^2-1))
+replicate=round(replicate,2)
+replicate_typical <- data.frame(strength, replicate)
+data.frame(strength,pval,round(zval,2),replicate)
+```
+
+Independent dataset:
+
+```{r}
+replicate=sapply(zval,replcalc,p=p_rob,m=m,s=sqrt(sigma_rob^2-1))
+replicate=round(replicate,2)
+replicate_typical <- data.frame(strength, replicate)
+data.frame(strength,pval,round(zval,2),replicate)
+```
+
+
+## Sample size multiplier
+
+Conditional replication rates when the original study has $z=2$ or $z=3.3$ and the replication study is $1,2,\dots,10$ times larger.
+
+SMD:
+
+```{r}
+# calculate replication probabilities when increasing sample size
+replicate_rep_weak = sapply(1:10, function(x) replcalc(2, p=p_SMD, m=m, s=sqrt(sigma_SMD^2-1), multiplier = x))
+replicate_rep_strong = sapply(1:10, function(x) replcalc(3.3, p=p_SMD, m=m, s=sqrt(sigma_SMD^2-1), multiplier = x))
+
+# prepare a data frame
+replicate_multiplier <- data.frame(evidence = c(rep("Weak evidence", 10), 
+                                                rep("Strong evidence", 10)), 
+                                   mult_values = rep(1:10, 2), 
+                                   replicate = c(replicate_rep_weak, 
+                                                 replicate_rep_strong))
+# round
+replicate_multiplier$replicate <- round(replicate_multiplier$replicate, 2)
+# data frame
+replicate_multiplier
+```
+
+lnRR:
+
+```{r}
+# calculate replication probabilities when increasing sample size
+replicate_rep_weak = sapply(1:10, function(x) replcalc(2, p=p_lnRR, m=m, s=sqrt(sigma_lnRR^2-1), multiplier = x))
+replicate_rep_strong = sapply(1:10, function(x) replcalc(3.3, p=p_lnRR, m=m, s=sqrt(sigma_lnRR^2-1), multiplier = x))
+
+# prepare a data frame
+replicate_multiplier <- data.frame(evidence = c(rep("Weak evidence", 10), 
+                                                rep("Strong evidence", 10)), 
+                                   mult_values = rep(1:10, 2), 
+                                   replicate = c(replicate_rep_weak, 
+                                                 replicate_rep_strong))
+# round
+replicate_multiplier$replicate <- round(replicate_multiplier$replicate, 2)
+# data frame
+replicate_multiplier
+```
+
+Zr:
+
+```{r}
+# calculate replication probabilities when increasing sample size
+replicate_rep_weak = sapply(1:10, function(x) replcalc(2, p=p_Zr, m=m, s=sqrt(sigma_Zr^2-1), multiplier = x))
+replicate_rep_strong = sapply(1:10, function(x) replcalc(3.3, p=p_Zr, m=m, s=sqrt(sigma_Zr^2-1), multiplier = x))
+
+# prepare a data frame
+replicate_multiplier <- data.frame(evidence = c(rep("Weak evidence", 10), 
+                                                rep("Strong evidence", 10)), 
+                                   mult_values = rep(1:10, 2), 
+                                   replicate = c(replicate_rep_weak, 
+                                                 replicate_rep_strong))
+# round
+replicate_multiplier$replicate <- round(replicate_multiplier$replicate, 2)
+# data frame
+replicate_multiplier
+```
+
+Independent dataset:
+
+```{r}
+# calculate replication probabilities when increasing sample size
+replicate_rep_weak = sapply(1:10, function(x) replcalc(2, p=p_rob, m=m, s=sqrt(sigma_rob^2-1), multiplier = x))
+replicate_rep_strong = sapply(1:10, function(x) replcalc(3.3, p=p_rob, m=m, s=sqrt(sigma_rob^2-1), multiplier = x))
+
+# prepare a data frame
+replicate_multiplier <- data.frame(evidence = c(rep("Weak evidence", 10), 
+                                                rep("Strong evidence", 10)), 
+                                   mult_values = rep(1:10, 2), 
+                                   replicate = c(replicate_rep_weak, 
+                                                 replicate_rep_strong))
+# round
+replicate_multiplier$replicate <- round(replicate_multiplier$replicate, 2)
+# data frame
+replicate_multiplier
+```
+
