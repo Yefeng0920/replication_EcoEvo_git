@@ -1,8 +1,14 @@
-# Visualization toolkits for enriching meta-analyses through evidence map, bibliometrics, and alternative impact metrics
+# A large-scale in silico replication project of ecological and evolutionary studies
 
-## Overview
 
-This is a repository containing the data and code (both in `R` and `Julia`) for reproducing results from:    
+## Transparency declaration
+
+The lead author (the manuscript’s guarantor) affirms that the manuscript is an honest, accurate, and transparent account of the study being reported; that no important
+aspects of the study have been omitted.
+
+## Data, code, and materials transparency
+
+This reporsitory contains all data and code (both in `R` and `Julia`)  used to reproduce the results reported in the following manuscript:
 
 > Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa. A large-scale in silico replication project of ecological and evolutionary studies. 2024.
 
@@ -19,13 +25,13 @@ The repository contains the following folders:
 
 - `R`
 
-- Julia
+- `Julia`
 
-- func
+- `func`
  
-- figure
-  
+- `figure`
 
+  
 ### `data` folder
 
 The `data` folder includes the raw data files that were retrieved from meta-analysis papers published in different disciplines.
