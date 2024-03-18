@@ -2,21 +2,31 @@
 
 ## Overview
 
-This is a repository containing the data and code for reproducing results from:    
+This is a repository containing the data and code (both in `R` and `Julia`) for reproducing results from:    
 
-> Yefeng Yang, Malgorzata Lagisz, Shinichi Nakagawa. Enriching meta-analyses through scoping review, bibliometrics, and alternative impact metrics: Visualizing study characteristics, hidden risk of bias, societal influence, and research translation. arXiv, 2023.
+> Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa. A large-scale in silico replication project of ecological and evolutionary studies. 2024.
+
+## General instructions for reproducibility
+
+xxx
+
 
 ## Structure
 
 The repository contains the following folders:
 
-- Data
+- `data`
 
-- Function
+- `R`
 
-- R
+- Julia
 
-### `Data` folder
+- func
+ 
+- figure
+  
+
+### `data` folder
 
 The `data` folder includes the raw data files that were retrieved from meta-analysis papers published in different disciplines.
 
