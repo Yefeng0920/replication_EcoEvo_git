@@ -36,19 +36,32 @@ The repository contains 5 folders:
 
 The `data` folder includes three sub-folders:
 
-`data/main` containing raw data for reproducing the main analyses.
+`data/main` contains raw data for reproducing the main analyses.
 
 `data/sensitivity` containing raw data for reproducing the sensitivity analyses.
 
-`data/model` containing model estimates from the `R` and `Julia` code for reproducing the figures.
+`data/model` contains model estimates from the `R` and `Julia` code for reproducing the figures reported in the main text and supplementary materials.
+
+### `R` folder
+
+The `R` folder includes three `.rmd` files:
+
+`R/main.Rmd` contains the R scripts used to reproduce all results (in terms of point estimates) shown in the main text. 
+
+`R/sensitivity.Rmd` contains the R scripts used to reproduce all results (in terms of point estimates) shown in the supplementary materials. 
+
+`R/figure.Rmd` contains the R scripts used to reproduce all figures shown in the main text. 
+
+`R/SI figure.Rmd` contains the R scripts used to reproduce all supplementary figures corresponding to the sensitivity analyses.
+
+Note that the data (or, more precisely, confidence intervals) used by `R/figure.Rmd` and `R/SI figure.Rmd` are producded [`Empirikos.jl`](https://github.com/nignatiadis/Empirikos.jl), a `Julia` package implementing Dvoretzky-Kiefer-Wolfowitz F-Localization approach to compute confidence intervals for nonparametric Empirical Bayes. 
+
 
 ### `Function` folder
 
 The `Function` folder includes all the custom R functions used to generate the sample figures shown in the main text.
 
-### `R` folder
 
-The `R` folder includes the R scripts used to reproduce all figures shown in the main text. The scripts are formatted both in Rmarkdown (`MA_Map_Bib_V2.Rmd`) and html (`MA_Map_Bib_V2.html`).
 
 ## Licence
 
