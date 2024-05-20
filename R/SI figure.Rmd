@@ -65,9 +65,10 @@ theme_custom <- ggplot2::theme_grey() +
 ```{r}
 # main dataset
 d <- read.csv(here("data/main","main_dat_processed.csv"))
-d = group_by(d,study) %>% mutate(count=n(),w=1/count) 
+d = group_by(d,study2) %>% mutate(count=n(),w=1/count) 
 # model estimates
-df=readRDS(here("data/model","df.rds"))
+#df=readRDS(here("data/model","df.rds"))
+df=read.csv(here("data/model","df_main.csv"))
 p=df$p
 m=df$m
 sigma=df$sigma
@@ -84,6 +85,7 @@ p1 <- ggplot(d, aes(x = abs(z))) +
 
 # SMD subset
 d_SMD <- read.csv(here("data/sensitivity","dat_processed_SMD.csv"))
+d_SMD = group_by(d_SMD,study2) %>% mutate(count=n(),w=1/count)
 # model estimates
 df=read.csv(here("data/model","df_SMD.csv"))
 p=df$p
@@ -103,6 +105,7 @@ p2 <- ggplot(d_SMD, aes(x = abs(z))) +
 
 # lnRR subset
 d_lnRR <- read.csv(here("data/sensitivity","dat_processed_lnRR.csv"))
+d_lnRR = group_by(d_lnRR,study2) %>% mutate(count=n(),w=1/count)
 # model estimates
 df=read.csv(here("data/model","df_lnRR.csv"))
 p=df$p
@@ -121,6 +124,7 @@ p3 <- ggplot(d_lnRR, aes(x = abs(z))) +
 
 # Zr subset
 d_Zr <- read.csv(here("data/sensitivity","dat_processed_Zr.csv"))
+d_Zr = group_by(d_Zr,study2) %>% mutate(count=n(),w=1/count)
 # model estimates
 df=read.csv(here("data/model","df_Zr.csv"))
 p=df$p
@@ -140,6 +144,7 @@ p4 <- ggplot(d_Zr, aes(x = abs(z))) +
 
 # rob subset
 d_rob <- read.csv(here("data/sensitivity","dat_processed_rob.csv"))
+d_rob = group_by(d_rob,study) %>% mutate(count=n(),w=1/count)
 # model estimates
 df=read.csv(here("data/model","df_rob.csv"))
 p=df$p
@@ -162,8 +167,6 @@ p1 / (p2 | p3) / (p4 + p5) + plot_annotation(tag_levels = 'A')
 dev.off()
 
 ```
-
-
 
 
 # Figure S2
@@ -543,7 +546,7 @@ dev.off()
 ```{r, warning=FALSE,echo=TRUE}
 # main dataset
 # model estimates
-df=readRDS(here("data/model","df.rds"))
+df=read.csv(here("data/model","df_main.csv"))
 p=df$p
 m=df$m
 sigma=df$sigma

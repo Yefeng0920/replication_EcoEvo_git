@@ -78,8 +78,10 @@ We estimate the distribution of the z-statistics across the trials for each type
 
 ```{r, warning=FALSE, echo=TRUE, eval=TRUE}
 # SMD
+d_SMD = group_by(d_SMD,study2) %>% mutate(count=n(),w=1/count)
 # fit data
-# df=mix(z=d_SMD$z,k=4,c1=0,c2=10,weights=d_SMD$w)
+df=mix(z=d_SMD$z,k=4,c1=0,c2=10,weights=d_SMD$w)
+#write.csv(df, here("data/model","df_SMD.csv"), row.names = F)
 # alternative, load the pre-fitted model
 df=read.csv(here("data/model","df_SMD.csv"))
 p_SMD=df$p
@@ -91,8 +93,10 @@ sigma_SMD=df$sigma
 ## lnRR
 ```{r, warning=FALSE, echo=TRUE, eval=TRUE}
 # lnRR
+d_lnRR = group_by(d_lnRR,study2) %>% mutate(count=n(),w=1/count)
 # fit data
-# df=mix(z=d_lnRR$z,k=4,c1=0,c2=10,weights=d_lnRR$w)
+df=mix(z=d_lnRR$z,k=4,c1=0,c2=10,weights=d_lnRR$w)
+#write.csv(df, here("data/model","df_lnRR.csv"), row.names = F)
 # alternative, load the pre-fitted model
 df=read.csv(here("data/model","df_lnRR.csv"))
 p_lnRR=df$p
@@ -103,8 +107,10 @@ sigma_lnRR=df$sigma
 ## Zr
 ```{r, warning=FALSE, echo=TRUE, eval=TRUE}
 # Zr
+d_Zr = group_by(d_Zr,study2) %>% mutate(count=n(),w=1/count)
 # fit data
 df=mix(z=d_Zr$z,k=4,c1=0,c2=10,weights=d_Zr$w)
+#write.csv(df, here("data/model","df_Zr.csv"), row.names = F)
 # alternative, load the pre-fitted model
 df=read.csv(here("data/model","df_Zr.csv"))
 p_Zr=df$p
@@ -118,8 +124,10 @@ We estimate the distribution of the z-statistics across the trials for the indep
 
 ```{r, warning=FALSE, echo=TRUE, eval=TRUE}
 # robust
+d_rob = group_by(d_rob,study) %>% mutate(count=n(),w=1/count)
 # fit data
 df=mix(z=d_rob$z,k=4,c1=0,c2=10,weights=d_rob$w)
+#write.csv(df, here("data/model","df_rob.csv"), row.names = F)
 # alternative, load the pre-fitted model
 df=read.csv(here("data/model", "df_rob.csv"))
 p_rob=df$p

@@ -79,8 +79,7 @@ replicate.dist <- ggplot(data = df, aes(x = z, y = replicate)) +
   scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
                      minor_breaks=seq(0,1,0.05), 
                      expand = expansion(mult = c(0, 0.01)), labels = scales::percent_format(accuracy=1)) +
-  scale_x_continuous(breaks = seq(0, 10, by = 2), minor_breaks=seq(0,10,1),
-                     expand = expansion(mult = c(0, 0.025))) +
+  scale_x_continuous(limits = c(0, 9), breaks = seq(0, 9, by = 2), minor_breaks=seq(0,9,1), expand = expansion(mult = c(0, 0))) + # 0.025
   ylab("Replicability") + xlab(expression(paste(italic(z)~"statistic"))) +
   labs(colour = NULL) + 
   theme_custom + 
@@ -98,20 +97,29 @@ top.dist2 <- ggplot(data=df2, aes(x = z, y=density)) +
   geom_ribbon(data=filter(df2,z>=2),aes(z, ymax=upper_ci, ymin=lower_ci), fill="#E7298A", alpha = 0.2) +
   geom_segment(aes(x = 2 , y = 0, xend = 2, yend = 0.185), linetype = "dashed", color = "grey") + 
   
-  scale_x_continuous(limits = c(0, 10), breaks = seq(0, 10, by = 2), expand = expansion(mult = c(0, 0.025))) + 
-  scale_y_continuous(expand = expansion(mult = c(0, 0.01))) + 
-  labs(x = "", y = "") + 
-  theme_void() +
-  theme(plot.margin = grid::unit(c(0, 0, 0, 0), "lines"))
+  scale_x_continuous(limits = c(0, 9), breaks = seq(0, 9, by = 2), expand = expansion(mult = c(0, 0))) + 
+  scale_y_continuous(expand = expansion(mult = c(0, 0.01)),
+                     labels = scales::percent_format(accuracy=1)) + 
+  labs(x = "", y = "Density") + 
+  #theme_void() +
+  theme_minimal() +
+  theme(plot.margin = grid::unit(c(0, 0, 0, 0), "lines"),
+        axis.title.y = element_text(margin = margin(r = 10), size = 15, color = "black"),
+        axis.text.y = element_text(size = 13, color = "white"),
+        axis.line.x = element_blank(),  
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
 
 
-png(filename = here("figure","fig 1.png"), width = 6, height = 5, units = "in", type = "windows", res = 400)
+png(filename = here("figure","fig 1.png"), width = 6, height = 8, units = "in", type = "windows", res = 400)
 plot_grid(top.dist2,
           replicate.dist,
           align = "v",
           ncol = 1,
           axis = "bl", 
-          rel_heights = c(0.8,1))
+          rel_heights = c(0.6,1))
 dev.off()
 ```
 
@@ -147,9 +155,9 @@ evidence.rep.p <- ggplot(df, aes(x= strength, y = replicate, ymin=lower_ci, ymax
   scale_fill_manual(values=barCOLS[2]) +
   scale_color_manual(values=dotCOLS[2]) +
   #scale_size(range=c(8,15)) +
-  geom_text(aes(label = scales::percent(replicate)), size = 4, color = "#A6761D", vjust = -2.5) + 
-  #geom_text(aes(label = evidence2), size = 3.5, color = "#A6761D", vjust = -3) +
-  geom_text(aes(label = evidence3), size = 3.5, color = "#A6761D", vjust = 3) + 
+  geom_text(aes(label = scales::percent(replicate,1)), size = 4.5, color = "black", vjust = -2.5) + # #A6761D
+  #geom_text(aes(label = evidence2), size = 3.5, color = "black", vjust = -3) + # #A6761D
+  geom_text(aes(label = evidence3), size = 4, color = "black", vjust = 4.5) + 
   scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
                      minor_breaks=seq(0,1,0.05), labels = scales::percent_format(accuracy=1)) + # expand = expansion(mult = c(0, 0)),
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10), expand = expansion(mult = c(0.03, 0.03))) + 
@@ -188,12 +196,12 @@ replicate_multiplier.p <- df %>% ggplot() +
         panel.grid.major = element_line(color = "grey", linetype = "dotted"),
         panel.grid.minor = element_line(color = "black", linetype = "dotted"),
         plot.margin=unit(c(0,0.3,0,0), 'cm')) +
-  annotate("text", x = 3, y = 0.50, label = "Weak evidence", size = 5, color = "#A6761D") +
+  annotate("text", x = 3, y = 0.50, label = "Weak evidence", size = 5, color = "black") + # #A6761D
   #annotate("text", x = 3, y = 0.75, label = "Moderate evidence", size = 4, color = "#A6761D") +
-  annotate("text", x = 3, y = 0.84, label = "Strong evidence", size = 5, color =  "#A6761D")
+  annotate("text", x = 3, y = 0.84, label = "Strong evidence", size = 5, color =  "black")
 
 
-png(filename = here("figure","fig 2.png"), width = 7, height = 11, units = "in", type = "windows", res = 400)
+png(filename = here("figure","fig 2.png"), width = 8, height = 14, units = "in", type = "windows", res = 400)
 plot_grid(evidence.rep.p,
           replicate_multiplier.p,
           align = "v",
