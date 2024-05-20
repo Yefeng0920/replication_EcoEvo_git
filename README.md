@@ -70,6 +70,8 @@ The confidence interval is based on the Dvoretzky-Kiefer-Wolfowitz *F*-Localizat
 
 The `R` folder includes three `.rmd` files:
 
+`R/preprocess.Rmd` contains the `R` scripts used to clean data. One important aim of this `R` script is to resolve the potential issue of between-study dependency; that is, different meta-analyses might share the same primary studies, violating the assumption of the following statistical analyses.
+
 `R/main.Rmd` contains the `R` scripts used to reproduce all results (in terms of the point estimate) shown in the main text. 
 
 `R/sensitivity.Rmd` contains the `R` scripts used to reproduce all supplementary results (in terms of the point estimate). 
@@ -112,7 +114,7 @@ The University of New South Wales, Sydney, Australia
 
 Email: s.nakagawa@unsw.edu.au.  
 
-## Correspondence regarding the code
+## Correspondence regarding the analysis and code
 
 - Dr. Yefeng Yang
 
