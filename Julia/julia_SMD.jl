@@ -16,6 +16,7 @@ begin
 	using LaTeXStrings
 end
 
+
 # ╔═╡ 39c4502b-5968-4d61-a3bf-69a0da8ae95b
 pgfplotsx()
 

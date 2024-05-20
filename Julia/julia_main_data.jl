@@ -1,5 +1,6 @@
 ### A Pluto.jl notebook ###
 # v0.19.37
+print("Hi, Julia!")
 
 using Markdown
 using InteractiveUtils
