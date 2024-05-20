@@ -1,28 +1,27 @@
 ---
-title: A large-scale in silico replication project of ecological and evolutionary
-  studies
+title: "A large-scale in silico replication project of ecological and evolutionary studies"
 author: "Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa"
 header-includes: \usepackage{amsmath}
 output:
   word_document:
     toc: yes
     toc_depth: '2'
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
   pdf_document:
     toc: yes
     toc_depth: 2
     number_sections: yes
     keep_tex: no
-  html_document:
-    toc: yes
-    toc_depth: '2'
-    df_print: paged
 ---
 
 # Packages
 
 ```{r, warning=FALSE, echo=TRUE}
-knitr::opts_chunk$set(fig.height = 8, fig.width = 10)
-set.seed(2023)
+#knitr::opts_chunk$set(fig.height = 8, fig.width = 10)
+set.seed(2024)
 suppressPackageStartupMessages({
   library(dplyr)
   library(readr)
@@ -40,7 +39,7 @@ source(here("func","func.R"))
 
 # Data
 
-The database comprised 466 meta-analytic datasets and 111,321 observations of ecological and evolutionary effects, curated by Costello and Fox. These datasets were obtained through a systematic search of meta-analysis papers indexed in Web of Science categories relevant to ecology and evolutionary biology. We eliminated effect size estimates with zero and missing sampling variances.
+The database comprised 466 meta-analytic datasets and 88,218 observations of ecological and evolutionary effects, curated by Costello and Fox. These datasets were obtained through a systematic search of meta-analysis papers indexed in Web of Science categories relevant to ecology and evolutionary biology. We eliminated effect size estimates with zero and missing sampling variances.
 
 The 466 meta-analytic datasets encompassed diverse research topics within ecology and evolutionary biology. However, it is important to realize that the trials in our dataset are not a random sample of all the trials in the research field, and may therefore not be entirely representative.
 
@@ -48,58 +47,19 @@ Furthermore, it is well known that trials that do not reach statistical signific
 
 Import the main data (the `.csv` file named `main_dat.csv`).
 
-```{r}
-dat_all <- read.csv(here("data/main","main_dat.csv")) 
+```{r, warning=FALSE}
+dat_all <- read.csv(here("data/main","main_dat_processed.csv")) 
 head(dat_all)
-```
-
-Clean the dataset
-
-```{r,warning=FALSE}
-# basic cleaning 
-dat_all <- dat_all[!is.na(dat_all$eff.size) & !is.na(dat_all$var.eff.size), ] # remove NAs
-dat_all <- dat_all[dat_all$var.eff.size != 0, ] # remove negative and zero variance (sampling variance should be positive)
-
-# classify effect size measures
-grouped_es <- NA
-grouped_es[dat_all$eff.size.measure == "cohens.d"|
-           dat_all$eff.size.measure == "hedges.d"|
-           dat_all$eff.size.measure == "hedges.g"|
-           dat_all$eff.size.measure == "abs.hedges.d"|
-           dat_all$eff.size.measure == "SMD"] <- c("SMD") # (1) SMD: cohens.d,  hedges.d, hedges.g, abs.hedges.d, SMD
-grouped_es[dat_all$eff.size.measure == "log.ratio"] <- c("lnRR") # (2) lnRR: log.ratio
-grouped_es[dat_all$eff.size.measure == "z.r"] <- c("Zr") # (3) Zr: z.r
-# (4) binary: IRR, log.odds.ratio
-#grouped_es[dat_all$eff.size.measure == "IRR" | 
-#           dat_all$eff.size.measure == "log.odds.ratio"] <- c("binary") 
-grouped_es[dat_all$eff.size.measure == "mean.diff" |
-           dat_all$eff.size.measure == "reg.slope" | 
-           dat_all$eff.size.measure == "IRR" | 
-           dat_all$eff.size.measure == "log.odds.ratio"] <- c("uncommon") # (5) uncommon: mean.diff, reg.slope
-dat_all$grouped_es <- as.factor(grouped_es)
-
-
-# only select relevant variables
-dat <- dat_all %>% dplyr::select(paper.id, meta.analysis.paper, meta.analysis.id, meta.analysis.year, study, study.year, eff.size.measure, grouped_es, eff.size, var.eff.size)
-
-dat <- dat %>% mutate(se.eff.size = sqrt(var.eff.size)) # create the variable of sampling error
-dat <- dat %>% mutate(z = eff.size/se.eff.size) # calculate z value
-
-# create a variable to label each MA
-dat$MA_case <- paste("MA", dat$meta.analysis.id, sep = "_")
-
 # make a copy
-d <- dat
-
-nrow(d)                               # number of estimates
-length(unique(dat$study))             # number of unique studies
-length(unique(dat$meta.analysis.id))  # number of meta-analyses
-
+d <- dat_all
+nrow(d)                             # number of estimates
+length(unique(d$study2))            # number of unique studies
+length(unique(d$meta.analysis.id))  # number of meta-analyses
 ```
 
-We plot the $z$-statistics.
+We plot the $z$-statistics distribution:
 
-```{r, warning=FALSE, echo=FALSE}
+```{r, warning=FALSE, echo=FALSE, fig.align = 'center'}
 d=subset(d,!is.na(z))
 
 ggplot(d, aes(x = z)) + 
@@ -142,23 +102,25 @@ Since the z-statistics are the sum of the signal-to-noise ratio and a standard n
 
 Some studies have multiple outcomes, so we weight each study inversely proportional to how often it appears in our data set. 
 
-```{r, warning=FALSE, echo=TRUE, eval=TRUE, cache=TRUE}
+```{r, warning=FALSE, echo=TRUE, eval=TRUE, cache=F}
 # count number of outcomes per study
-d = group_by(d,study) %>% mutate(count=n(),w=1/count) 
+d = group_by(d,study2) %>% mutate(count=n(),w=1/count)
 # censor two extreme z values at, say, -100 and 100, respectively
 d$z[d$z == max(d$z)] = 100
 d$z[d$z == min(d$z)] = -100
 
-df=mix(z=d$z,k=4,c1=0,c2=10,weights=d$w)
+#df=mix(z=d$z,k=4,c1=0,c2=10,weights=d$w)
+#write.csv(df, here("data/model","df_main.csv"), row.names = F)
+df=read.csv(here("data/model","df_main.csv")) # to save time, we upload the pre-fitted model
 p=df$p
 m=df$m
 sigma=df$sigma
 round(df,2)
 ```
 
-We plot the _weighted_ histogram of the absolute $z$-statistics together with the fitted mixture. We see that the mixture fits quite well.
+We plot the _weighted_ histogram of the absolute $z$-statistics together with the fitted mixture: 
 
-```{r, warning=FALSE, echo=FALSE}
+```{r, warning=FALSE, echo=FALSE, fig.align = 'center'}
 df=data.frame(z=d$z,dens=2*dmix(x=abs(d$z),p=p,m=m,s=sigma)) 
 
 ggplot(d, aes(x = abs(z))) +
@@ -169,6 +131,8 @@ ggplot(d, aes(x = abs(z))) +
   labs(x = expression(paste(italic(z)~"statistic")), y = "Density") +
   theme_bw()
 ```
+
+We see that the mixture fits quite well.
 
 ## SNR
 
@@ -183,9 +147,9 @@ We have now estimated the marginal distributions of the z-statistics and the SNR
 Finally, we can use the well-known theory of bivariate normal distributions to obtain the conditional distribution of the SNR given the observed z-statistic.
 
 
-We show the joint distribution of z and SNR.
+We show the joint distribution of z and SNR:
 
-```{r}
+```{r, fig.align = 'center'}
 djoint <- function(x,y,p,m,s) { 
   dmix(y,p,m,s)*dnorm(x-y,mean=0,sd=1)  # conditional on SNR, z ~ N(SNR,1)
 }
@@ -251,9 +215,9 @@ power=pnorm(-1.96,snr,1) + 1 - pnorm(1.96,snr,1)
 df=data.frame(power=power)
 ```
 
-We can now show the power distribution with a histogram.
+We can now show the power distribution with a histogram:
 
-```{r , warning=FALSE,echo=FALSE}
+```{r , warning=FALSE,echo=FALSE, fig.align = 'center'}
 ggplot(df, aes(x=power, y=after_stat(density))) +
   geom_histogram(breaks=seq(0.05,1,length=40),fill="white",col="black") + 
   scale_x_continuous(breaks = seq(0,1,0.1), limits=c(0,1)) +
@@ -307,9 +271,9 @@ sum(d$w[ind]*replicate[ind])/sum(d$w[ind])  # conditional probability of replica
 ```
 
 
-Replication rate curve.
+Replication rate profile:
 
-```{r}
+```{r, fig.align = 'center'}
 # pdf of the z-stats
 density=dmix(d$z,p,m,sigma)
 
@@ -353,7 +317,7 @@ We show the conditional replication rates at selected z-values, re-formulated as
 The "scales of evidence" (like "no evidence", "weak evidence",...) are quite problematic, see Efron, B., Gous, A., Kass, R. E., Datta, G. S., & Lahiri, P. (2001). Scales of evidence for model selection: Fisher versus Jeffreys. Lecture Notes-Monograph Series, 208-256. It's even doubtful if p-values can be taken as measures of evidence at all. As Wasserstein puts it: "By itself, a p-value does not provide a good measure of evidence regarding a model or hypothesis." See Wasserstein, R. L., & Lazar, N. A. (2016). The ASA statement on p-values: context, process, and purpose. The American Statistician, 70(2), 129-133.
 
 
-```{r}
+```{r, fig.align = 'center'}
 pval=c(0.1,0.05,0.01,0.001,0.0001)
 strength = c("No evidence", "Weak evidence","Moderate evidence",
              "Strong evidence","Very strong evidence")
@@ -373,21 +337,16 @@ replicate_typical.p <- ggplot(replicate_typical, aes(x = replicate, y = strength
   geom_point(aes(size = replicate)) +
   scale_size(range=c(8,15)) +
   geom_text(aes(label = scales::percent(replicate)), size = 3.5, color = "white") + 
-  annotate("text", x = replicate[1] + 0.164, y = 1, label = 'paste("[", italic(p), "= 0.1,"~"z = 1.64", "]", sep = "")', parse = TRUE, size = 3.5) +
-annotate("text", x = replicate[2] + 0.181, y = 2, label = 'paste("[", italic(p), "= 0.05,"~"z = 1.96", "]", sep = "")', parse = TRUE, size = 3.5) +
-annotate("text", x = replicate[3] + 0.185, y = 3, label = 'paste("[", italic(p), "= 0.01,"~"z = 2.576", "]", sep = "")', parse = TRUE, size = 3.5) +
-annotate("text", x = replicate[4] + 0.208, y = 4, label = 'paste("[", italic(p), "= 0.001,"~"z = 3.29", "]", sep = "")', parse = TRUE, size = 3.5) +
-annotate("text", x = replicate[5] + 0.228, y = 5, label = 'paste("[", italic(p), "= 0.0001,"~"z = 3.89", "]", sep = "")', parse = TRUE, size = 3.5) +
   guides(size = "none") +
   xlab("Replication rate") + 
   labs(colour = NULL, y = "") +
   theme_bw() + 
-  theme(axis.title = element_text(size = 18),
-        axis.text.x = element_text(size = 16),
-        axis.text.y = element_text(size = 18),
+  theme(axis.title = element_text(size = 12),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
         plot.margin=unit(c(0,0,0,0), 'cm')) + 
-  scale_x_continuous(limits = c(0, 1.25), breaks = seq(0, 1, by = 0.2),
-                     minor_breaks=seq(0,1,0.05), expand = expansion(mult = c(0, 0))) 
+  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2),
+                     minor_breaks=seq(0,1,0.05)) 
 
 replicate_typical.p
 ```
@@ -399,7 +358,7 @@ If the sample size of the replication study is twice as large as that of the ori
 
 Conditional replication rates when the original study has $z=2$ or $z=3.3$ and the replication study is $1,2,\dots,10$ times larger.
 
-```{r}
+```{r, fig.align = 'center'}
 # calculate replication probabilities when multiplying the 
 # sample size of the original study with factors 1,2,...10.
 replicate_rep_weak = sapply(1:10, function(x) replcalc(2, p=p, m=m, s=sqrt(sigma^2-1), multiplier = x))
@@ -435,10 +394,10 @@ replicate_multiplier.p <- replicate_multiplier %>%
   guides(size = "none", color = "none", fill = "none") +
   labs(colour = NULL) + 
   theme_bw() + 
-  theme(axis.title = element_text(size = 18),
-        axis.text = element_text(size = 16),
+  theme(axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12),
         plot.margin=unit(c(0.2,0.3,0,0), 'cm')) +
-  annotate("text", x = 3, y = 0.5, label = "Weak evidence", size = 4) +
-  annotate("text", x = 3, y = 0.85, label = "Strong evidence", size = 4)
+  annotate("text", x = 3, y = 0.5, label = "Weak evidence", size = 3) +
+  annotate("text", x = 3, y = 0.85, label = "Strong evidence", size = 3)
 replicate_multiplier.p
 ```
