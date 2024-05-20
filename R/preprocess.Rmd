@@ -1,0 +1,134 @@
+---
+title: "A large-scale in silico replication project of ecological and evolutionary studies"
+author: "Yefeng Yang, Erik van Zwet, Nikolaos Ignatiadis, Shinichi Nakagawa"
+header-includes: \usepackage{amsmath}
+output:
+  word_document:
+    toc: yes
+    toc_depth: '2'
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+    number_sections: yes
+    keep_tex: no
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+
+# Packages
+```{r}
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(stringr)
+  library(here)
+})
+```
+
+# Raw data
+
+
+Our cross-meta-analysis dataset has potential between-study dependency given that it is possible that different meta-analyses included the same study. To deal with this dependency, we used a conservative strategy to remove the duplicated studies. The strategy we used might lead to false positives (non-duplicated studies were mistakenly removed). But given our dataset has a large sample, it is accetable to resolve the between-study dependency in the sacrifice of a certain amount of non-duplicated studies.
+
+Import the main data (the `.csv` file named `main_dat.csv`). 
+
+```{r}
+dat_all <- read.csv(here("data/main","main_dat.csv")) 
+head(dat_all)
+```
+
+Clean the dataset
+
+```{r,warning=FALSE}
+# basic cleaning 
+dat_all <- dat_all[!is.na(dat_all$eff.size) & !is.na(dat_all$var.eff.size), ] # remove NAs
+dat_all <- dat_all[dat_all$var.eff.size != 0, ] # remove negative and zero variance (sampling variance should be positive)
+
+# classify effect size measures
+grouped_es <- NA
+grouped_es[dat_all$eff.size.measure == "cohens.d"|
+           dat_all$eff.size.measure == "hedges.d"|
+           dat_all$eff.size.measure == "hedges.g"|
+           dat_all$eff.size.measure == "abs.hedges.d"|
+           dat_all$eff.size.measure == "SMD"] <- c("SMD") # (1) SMD: cohens.d,  hedges.d, hedges.g, abs.hedges.d, SMD
+grouped_es[dat_all$eff.size.measure == "log.ratio"] <- c("lnRR") # (2) lnRR: log.ratio
+grouped_es[dat_all$eff.size.measure == "z.r"] <- c("Zr") # (3) Zr: z.r
+# (4) binary: IRR, log.odds.ratio
+#grouped_es[dat_all$eff.size.measure == "IRR" | 
+#           dat_all$eff.size.measure == "log.odds.ratio"] <- c("binary") 
+grouped_es[dat_all$eff.size.measure == "mean.diff" |
+           dat_all$eff.size.measure == "reg.slope" | 
+           dat_all$eff.size.measure == "IRR" | 
+           dat_all$eff.size.measure == "log.odds.ratio"] <- c("uncommon") # (5) uncommon: mean.diff, reg.slope
+dat_all$grouped_es <- as.factor(grouped_es)
+
+
+# only select relevant variables
+dat <- dat_all %>% dplyr::select(paper.id, meta.analysis.paper, meta.analysis.id, meta.analysis.year, study, study.year, eff.size.measure, grouped_es, eff.size, var.eff.size)
+
+dat <- dat %>% mutate(se.eff.size = sqrt(var.eff.size)) # create the variable of sampling error
+dat <- dat %>% mutate(z = eff.size/se.eff.size) # calculate z value
+```
+
+# Deduplicate
+
+```{r}
+# remove multiple outcomes per study within the same meta-analysis
+d=group_by(dat,paper.id,study) %>% 
+  summarize(study=first(study),
+            year=first(study.year),
+            .groups='drop')
+
+d$study2=str_replace_all(d$study, "_", "AAA")
+#d$study2=str_replace_all(d$study2, "\\.", "AAA")
+d$study2=str_replace_all(d$study2, " ", "AAA")
+#d$study2=str_replace_all(d$study2, "[:digit:]", "")
+d$study2=str_replace_all(d$study2, "[^[:alnum:]]", "") # remove non-alphanumeric
+d$study2=sub("AAA.*", "", d$study2)              # remove after first whitespace
+d$study2=str_to_lower(d$study2)
+d$study2=paste(d$study2,d$year,sep="_")
+
+d=d[sample(nrow(d)),]          # put in random order before flagging duplications
+d$dup=duplicated(d$study2)
+data.frame(nrow(d),sum(d$dup),mean(d$dup))
+
+d=d %>% arrange(study2)
+d=group_by(d,study2) %>% mutate(n=n())  # count duplications
+
+#' \newpage
+tmp1=filter(d,n>1)                       # duplicated at least once
+tmp1=select(tmp1,paper.id, study,year,study2,dup) # add variable "paper.id"
+print(tmp1,n=40)
+
+#' \newpage
+tmp2=filter(d,n==1)                      # not duplicated
+tmp2=select(tmp2,study,year,study2)
+tmp2=arrange(tmp2,year,study)
+print(tmp2,n=40)
+
+
+#' \newpage
+
+# join to original data
+dat$key=paste(dat$paper.id,dat$study,dat$study.year,sep="_")
+d$key=paste(d$paper.id,d$study,d$year,sep="_")
+dat=left_join(dat,select(d,key,study2,dup),by="key")
+#data.frame(nrow(dat),mean(dat$dup,na.rm=TRUE),mean(is.na(dat$dup)))
+
+main_dat_processed=filter(dat,dup=="FALSE")
+```
+
+# Save
+
+```{r}
+# main data
+write.csv(main_dat_processed, here("data/main","main_dat_processed.csv"), row.names = F)
+# subset of lnRR
+write.csv(filter(main_dat_processed, grouped_es == "lnRR"), here("data/sensitivity","dat_processed_lnRR.csv"), row.names = F)
+# subset of SMD
+write.csv(filter(main_dat_processed, grouped_es == "SMD"), here("data/sensitivity","dat_processed_SMD.csv"), row.names = F)
+# subset of Zr
+write.csv(filter(main_dat_processed, grouped_es == "Zr"), here("data/sensitivity","dat_processed_Zr.csv"), row.names = F)
+```
+
