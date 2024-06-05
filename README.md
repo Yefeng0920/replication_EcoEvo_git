@@ -3,7 +3,7 @@
 
 ## Transparency declaration
 
-The authors affirms that the manuscript is an honest, accurate, and transparent account of the study being reported, and no important
+The authors affirm that the manuscript is an honest, accurate, and transparent account of the study being reported, and no important
 aspects of the study have been omitted.
 
 ## Reproducibility declaration
