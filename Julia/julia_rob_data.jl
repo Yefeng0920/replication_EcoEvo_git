@@ -16,12 +16,11 @@ begin
 	using LaTeXStrings
 end
 
-
 # ╔═╡ 39c4502b-5968-4d61-a3bf-69a0da8ae95b
 pgfplotsx()
 
 # ╔═╡ a1f65daa-ebad-4caa-a725-ec7a75cec406
-df = CSV.read("dat_processed_SMD.csv", DataFrame; ntasks=1)
+df = CSV.read("dat_processed_rob.csv", DataFrame; ntasks=1)
 
 # ╔═╡ a99ff6d7-a0fd-4c75-a74f-9c159803d2f3
 discr = interval_discretizer(2.3:0.1:10.0)
@@ -70,9 +69,12 @@ md"""### 4-component $\widehat{G}$ estimated in R Code"""
 
 # ╔═╡ 83861c6d-a842-4df9-8a24-215ff6b680b6
 Ĝ = MixtureModel( 
-	Normal.(0.0,  [2.187030424;  2.206514073;  0.000200133; 6.628918386]),
-    Empirikos.fix_πs([0.571806529; 0.150030487; 0.142624093; 0.13553889])
+	Normal.(0.0,  [6.029132563;  0.017282332;  2.233983923; 8.264426539]),
+    Empirikos.fix_πs([4.36e-05; 0.132638347; 0.716106607; 0.151211401])
 )
+
+
+
 
 # ╔═╡ 84913324-568b-4b8c-9674-86bca1da742e
 md"""### Replication Probability"""
@@ -213,7 +215,7 @@ ci_dataframe = DataFrame(
 )
 
 # ╔═╡ c5e6e4f4-9711-4c4b-a47f-caa0db92cb99
-CSV.write("confidence_intervals_SMD.csv", ci_dataframe)
+CSV.write("confidence_intervals_rob.csv", ci_dataframe)
 
 # ╔═╡ 2f5992df-9274-40c2-8a9a-ce63cc340404
 md"""### Replication with increasing sample size"""
@@ -294,4 +296,4 @@ ci_multiplier_dataframe = DataFrame(
 )
 
 # ╔═╡ 27c9e1c7-e53a-46bc-9655-a4637e6bbd69
-CSV.write("confidence_intervals_sample_size_multiplier_SMD.csv", ci_multiplier_dataframe)
+CSV.write("confidence_intervals_sample_size_multiplier_rob.csv", ci_multiplier_dataframe)
